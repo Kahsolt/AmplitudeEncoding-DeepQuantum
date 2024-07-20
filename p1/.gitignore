@@ -1,4 +1,4 @@
-__pycache__/
-output/
-
 data/
+
+output/*
+!output/*.json

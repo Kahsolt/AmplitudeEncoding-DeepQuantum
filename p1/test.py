@@ -3,13 +3,12 @@ import pickle
 
 import torch
 from torch.utils.data import DataLoader
-import torch.profiler as profiler
-from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
+#import torch.profiler as profiler
+#from sklearn.metrics import confusion_matrix
 
-import deepquantum as dq
 from model import QuantumNeuralNetwork
-from utils import reshape_norm_padding, cir_collate_fn, FakeDataset, get_fidelity, get_acc, FakeDatasetApprox, QMNISTDataset, MNISTDataset
+from utils import MNISTDataset, cir_collate_fn, reshape_norm_padding, get_fidelity, get_acc
+from utils import QMNISTDataset, QMNISTDatasetIdea, DataHolder      # keep for unpickle
 
 
 @torch.inference_mode()
@@ -67,31 +66,27 @@ def validate_test_dataset(test_dataset):
 if __name__ == '__main__':
     DEVICE = "cuda:0"
     OUTPUT_DIR = "output"
-    BATCH_SIZE = 512
+    BATCH_SIZE = 514    # test samples: 5139
 
-    DEBUG_DUMMY = False
+    # 数据集
+    with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
+        test_dataset = pickle.load(file)
+    if not validate_test_dataset(test_dataset):
+        raise RuntimeError('>> Error: test_dataset is not valid')
 
-    if DEBUG_DUMMY:
-        test_dataset = FakeDataset(size=10, noise_strength=0.01)
-        test_dataset = FakeDatasetApprox(size=20, noise_strength=0.0)
-    else:
-        with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
-            test_dataset = pickle.load(file)
-        if not validate_test_dataset(test_dataset):
-            raise RuntimeError(f'test_dataset is not valid')
-
+    # 模型
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)
-    x, y, z = next(iter(test_loader))
-    x, y, z = x.to(DEVICE), y.to(DEVICE), z.to(DEVICE)
-
     with open(f'{OUTPUT_DIR}/model_config.pkl', 'rb') as file:
         model_config = pickle.load(file)
-    model = QuantumNeuralNetwork(**model_config).to(DEVICE)
-    output = model.inference(z)     # sanity test
-
+    model = QuantumNeuralNetwork(**model_config)
     model.load_state_dict(torch.load(f'{OUTPUT_DIR}/best_model.pt', map_location=torch.device('cpu')))
 
-    # 测试模型
+    # 模型理智检查
+    if not 'sanity check':
+        x, y, z = next(iter(test_loader))
+        output = model.inference(z)
+
+    # 模型测试
     t0 = time.time()
     acc, fid, gates = test_model(model, test_loader, DEVICE)
     torch.cuda.current_stream().synchronize()
@@ -107,5 +102,4 @@ if __name__ == '__main__':
     gates_score = 1 - gates / 1000.0
     runtime_score = 1 - runtime / 360.0
     score = (2 * fid + acc + gates_score + 0.1 * runtime_score) * 100
-
     print(f'客观得分: {score:.3f}')

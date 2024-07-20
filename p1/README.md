@@ -57,7 +57,7 @@
 
 【如何使用】
 
-- `python utils.py`: 用量子线路编码每一张图片，实例化测试集 QMNISTDataset 并保存为pickle文件
+- `python utils.py`: 用量子线路编码每一张图片，实例化测试集 QMNISTDataset 并保存为 pickle 文件
 - `python model.py`: 调试模型
 - `python train.py`: 训练模型
 - `python test.py`: 测试模型
