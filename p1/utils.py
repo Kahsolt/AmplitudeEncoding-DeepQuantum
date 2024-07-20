@@ -1,28 +1,30 @@
-import torchvision.transforms as transforms
-import torchvision
-import torch.nn as nn
-import torch.nn.functional as F
+import os
+import random
+import pickle
+
+import torch
 from torch import optim
 from torch.utils.data import Dataset
+import torch.nn.functional as F
+from torchvision.datasets import MNIST
+import torchvision.transforms as T
 import deepquantum as dq
 import numpy as np
 from tqdm import tqdm
-import torch
-from torch.nn.utils import clip_grad_norm_
-import pickle
-import random
+
+if 'fix seed':
+    random.seed(42)
+    # 设置np随机种子为固定值，来控制 fake data 的随机性
+    np.random.seed(42)
+    # 设置torch随机种子为固定值，来控制 PQC 的随机性
+    torch.manual_seed(42)
+    torch.cuda.manual_seed_all(42)
 
 
-
-# random.seed(42)
-
-# # 设置np随机种子为固定值，来控制 fake data 的随机性
-# np.random.seed(42)
-
-# # 设置torch随机种子为固定值，来控制 PQC 的随机性
-# torch.manual_seed(4)
-# torch.cuda.manual_seed_all(4)
-
+transform = T.Compose([
+    T.ToTensor(),
+    T.Normalize((0.5,), (0.5,))
+])
 
 
 def count_gates(cir):
@@ -39,7 +41,7 @@ def reshape_norm_padding(x):
     x = x.reshape(x.size(0), -1)
     x = F.normalize(x, p=2, dim=-1)
     x = F.pad(x, (0, 1024 - x.size(1)), mode='constant', value=0)
-    return x.unsqueeze(-1).to(torch.complex64) # (batch_size, feaures1024, 1)
+    return x.unsqueeze(-1).to(torch.complex64)  # (batch_size, feaures1024, 1)
 
 
 def get_fidelity(state_pred, state_true):
@@ -49,7 +51,6 @@ def get_fidelity(state_pred, state_true):
     return fidelity.diag().mean()
 
 
-
 def get_acc(y_pred, y_true):
     # 计算准确率
     correct = (y_pred == y_true).float()
@@ -57,7 +58,19 @@ def get_acc(y_pred, y_true):
     return accuracy.item()
 
 
+def cir_collate_fn(batch):
+    """
+    返回：(原始经典数据batch, 标签batch, 振幅编码的量子态矢量batch)
+    """
+    xs, ys, zs = zip(*batch)
+    xs = torch.stack(xs)
+    ys = torch.stack(ys)
+    zs = torch.stack([cir() for cir in zs])
+    return xs, ys, zs
+
+
 class FakeDataset(Dataset):
+
     def __init__(self, size=10000, noise_strength=0.0):
         # a list of tuples (x, y, encoding_cir)
         self.data_list = self.generate_fake_data(size, noise_strength)
@@ -97,12 +110,8 @@ class FakeDataset(Dataset):
         return data_list
 
 
-
-
-
-
-
 class FakeDatasetApprox(Dataset):
+
     def __init__(self, size=10000, noise_strength=0.0):
         # a list of tuples (x, y, encoding_cir)
         self.data_list = self.generate_fake_data(size, noise_strength)
@@ -155,36 +164,8 @@ class FakeDatasetApprox(Dataset):
         return data_list
 
 
-
-
-
-        
-
-
-def cir_collate_fn(batch):
-    """
-    返回：(原始经典数据batch, 标签batch, 振幅编码的量子态矢量batch)
-    """
-    xs, ys, zs = zip(*batch)
-    xs = torch.stack(xs)
-    ys = torch.stack(ys)
-    zs = torch.stack([cir() for cir in zs])
-    return xs, ys, zs
-
-
-
-
-
-
-
-
-Transforms = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize((0.5,), (0.5,))])
-
-
-
 class MNISTDataset(Dataset):
+
     def __init__(self, label_list:list = [0, 1], train:bool = True, size:int = 100000000):
         """
         初始化 QMNISTDataset 类。
@@ -193,8 +174,9 @@ class MNISTDataset(Dataset):
             train (bool): 是否加载训练数据集，如果为 False，则加载测试数据集。默认为 True。
             size (int): 数据集的大小
         """
-        self.dataset = torchvision.datasets.MNIST(root='/data', train=train, download=True, transform=Transforms)
-        
+
+        self.dataset = MNIST(root='./data', train=train, download=True, transform=transform)
+
         # 构造原始标签到顺序标签的映射字典
         self.label_map = {}
         self.inverse_label_map = {}
@@ -207,7 +189,6 @@ class MNISTDataset(Dataset):
         for image, label in self.dataset:
             if label in label_list:
                 self.sub_dataset.append((image, self.label_map[label]))
-
         self.sub_dataset = self.sub_dataset[:size]
 
     def __len__(self):
@@ -218,16 +199,11 @@ class MNISTDataset(Dataset):
         y = torch.tensor(self.sub_dataset[idx][1], dtype=torch.long)
         return x, y
 
-    
-
-
-
-
-
 
 # 注意: 初赛的数据集名字必须固定为 QMNISTDataset
 # todo: 构建振幅编码线路
 class QMNISTDataset(Dataset):
+
     def __init__(self, label_list:list = [0, 1], train:bool = True, size:int = 100000000):
         """
         初始化 QMNISTDataset 类。
@@ -236,8 +212,9 @@ class QMNISTDataset(Dataset):
             train (bool): 是否加载训练数据集，如果为 False，则加载测试数据集。默认为 True。
             size (int): 数据集的大小
         """
-        self.dataset = torchvision.datasets.MNIST(root='/data', train=train, download=True, transform=Transforms)
-        
+
+        self.dataset = MNIST(root='./data', train=train, download=True, transform=transform)
+
         # 构造原始标签到顺序标签的映射字典
         self.label_map = {}
         self.inverse_label_map = {}
@@ -252,7 +229,6 @@ class QMNISTDataset(Dataset):
                 self.sub_dataset.append((image, self.label_map[label]))
 
         self.sub_dataset = self.sub_dataset[:size]
-
         self.data_list = self.generate_data()
 
     def __len__(self):
@@ -271,7 +247,6 @@ class QMNISTDataset(Dataset):
             gates_count += count_gates(encoding_cir)
         return gates_count / len(self.data_list)
     
-    
     def generate_data(self):
         """
         返回： a list of tuples (原始经典数据, 标签, 振幅编码量子线路)=(image, label, encoding_circuit)
@@ -283,27 +258,23 @@ class QMNISTDataset(Dataset):
             encoding_circuit = dq.QubitCircuit(10)
             encoding_circuit.rylayer()
             
-            # # 优化rylayer的参数，使得线路能够制备出|x>
-            # optimizer = optim.Adam(encoding_circuit.parameters(), lr=0.01)
-            # for _ in range(200):
-            #     state = encoding_circuit()
-            #     loss = 1 - get_fidelity(state, reshape_norm_padding(image.unsqueeze(0)))
-            #     optimizer.zero_grad()
-            #     loss.backward()
-            #     optimizer.step()
+            # 优化rylayer的参数，使得线路能够制备出|x>
+            optimizer = optim.Adam(encoding_circuit.parameters(), lr=0.01)
+            for _ in range(200):
+                state = encoding_circuit()
+                loss = 1 - get_fidelity(state, reshape_norm_padding(image.unsqueeze(0)))
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
             data_list.append((image, label, encoding_circuit))
 
         return data_list
 
 
-
-
-
-
 if __name__ == '__main__':
-
-    OUTPUT_DIR = 'output'
+    OUTPUT_DIR = './output'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # dataset = FakeDatasetApprox(size=20, noise_strength=0.0)
     # print(dataset[0])
@@ -315,17 +286,3 @@ if __name__ == '__main__':
 
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'wb') as file:
         pickle.dump(test_dataset, file)
-
-    
-
-
-
-
-
-
-
-
-
-
-
-

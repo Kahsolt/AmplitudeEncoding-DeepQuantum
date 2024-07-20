@@ -1,31 +1,20 @@
 import os
-import sys
-import uuid
 import json
 import shutil
 import glob
 import pickle
 
-
 import torch
-
-
 from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 from model import QuantumNeuralNetwork
-
 from utils import reshape_norm_padding, count_gates, cir_collate_fn, QMNISTDataset, FakeDataset, FakeDatasetApprox
 
 
-
-
-
-
-
-def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  output_dir, patience=10, device='cpu'):
+def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loader:DataLoader, valid_loader:DataLoader, num_epochs:int, output_dir, patience=10, device='cpu'):
     """
     Train and validate the model, implementing early stopping based on validation loss.
     The best model is saved, along with the loss history after each epoch and gradient norms.
@@ -105,22 +94,11 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
         else:
             epochs_no_improve += 1  # Increment the counter when no improvement
 
-
         if epochs_no_improve >= patience:
             tqdm.write("Early stopping triggered.")
             break  # Break out of the loop if no improvement for 'patience' number of epochs
 
     pbar.close()
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
@@ -131,70 +109,34 @@ if __name__ == '__main__':
     PATIENCE = 3 # if PATIENCE与NUM_EPOCHS相等，则不会触发early stopping
     OUTPUT_DIR  = 'output'
 
-   
-
-
-
-
-
-
-
-
-
-    # # dataset = FakeDataset(size=10, noise_strength=0.0)
+    # dataset = FakeDataset(size=10, noise_strength=0.0)
     # dataset = FakeDatasetApprox(size=20, noise_strength=0.0)
-    # print('debug', dataset[0])
-    # data_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)
-
-    # # 创建一个量子神经网络模型
-    # model_config = {'n_qubit': 10, 'n_layer': 30}
-    # model = QuantumNeuralNetwork(**model_config)
-
-    # optimizer = optim.Adam(model.parameters(), lr=0.01)
-
-    # # 训练模型
-    # train_model(model, optimizer, data_loader, 
-    #             data_loader, num_epochs=NUM_EPOCHS, 
-    #             output_dir=OUTPUT_DIR, device=DEVICE, patience=PATIENCE)
-    
-    # # 将字典保存到文件中
-    # with open(f'{OUTPUT_DIR}/model_config.pkl', 'wb') as file:
-    #     pickle.dump(model_config, file)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     dataset = QMNISTDataset(label_list=[0,1,2,3,4], train=True)
 
+    # 构建数据加载器，用于加载训练和验证数据
     train_size = int(0.7 * len(dataset))
     valid_size = len(dataset) - train_size
     train_dataset, valid_dataset = random_split(dataset, [train_size, valid_size])
-    # 构建数据加载器，用于加载训练和验证数据
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=cir_collate_fn)
     valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)
  
     # 创建一个量子神经网络模型
     model_config = {'n_qubit': 10, 'n_layer': 30}
     model = QuantumNeuralNetwork(**model_config)
-
     optimizer = optim.Adam(model.parameters(), lr=0.01)
 
     # 训练模型
-    train_model(model, optimizer, train_loader, 
-                valid_loader, num_epochs=NUM_EPOCHS, 
-                output_dir=OUTPUT_DIR, device=DEVICE, patience=PATIENCE)
-    
+    train_model(
+        model,
+        optimizer,
+        train_loader, 
+        valid_loader,
+        num_epochs=NUM_EPOCHS, 
+        output_dir=OUTPUT_DIR,
+        device=DEVICE,
+        patience=PATIENCE,
+    )
+
     # 将字典保存到文件中
     with open(f'{OUTPUT_DIR}/model_config.pkl', 'wb') as file:
         pickle.dump(model_config, file)
