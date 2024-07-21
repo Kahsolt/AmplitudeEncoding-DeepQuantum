@@ -258,30 +258,52 @@ class QMNISTDataset(Dataset):
 
     def generate_data(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
         """ a list of tuples (原始经典数据, 标签, 振幅编码量子线路)=(image, label, encoding_circuit) """
+        from amp_enc import amplitude_encode
+
         data_list = []
         for image, label in tqdm(self.sub_dataset):
-            # 构建振幅编码线路
-            # 随机初始化一个参数化的量子线路来自动学习U_w s.t. U_w|0>=|x>
-            encoding_circuit = dq.QubitCircuit(10)
-            encoding_circuit.ry(0)
-            for i in range(1, 10):
-                for j in range(0, i):
-                    pass
-                    encoding_circuit.ry(i)
-            print('cnt:', count_gates(encoding_circuit))
+            # 超参数
+            EPS = 0.001
+            GAMMA = 0.02
+            QT = 32
 
-            # 优化rylayer的参数，使得线路能够制备出|x>
-            target = reshape_norm_padding(image.unsqueeze(0))
-            optimizer = optim.Adam(encoding_circuit.parameters(), lr=0.1)
-            for _ in range(200):
-                state = encoding_circuit().swapaxes(0, 1)   # [B=1, D=1024]
+            # 原始数据
+            x: Tensor = image                               # [1, 28, 28]
+            target = reshape_norm_padding(x.unsqueeze(0))   # [1, 1024]
+
+            # 目标编码向量
+            target_approx = target
+            if QT:
+                x = denormalize(x)
+                vmin, vmax = x.min(), x.max()
+                x = (x - vmin) / (vmax - vmin)
+                x = ((x * 255 / QT).round() * QT) / 255
+                x = x * (vmax - vmin) + vmin
+                x = normalize(x)
+                target_approx = reshape_norm_padding(x.unsqueeze(0))
+
+            # 构建振幅编码线路
+            circ = amplitude_encode(target_approx[0].real.numpy().tolist(), eps=EPS, gamma=GAMMA)
+            print('gate count:', count_gates(circ))
+            print('param count:', sum([p.numel() for p in circ.parameters()]))
+
+            # 优化参数，使得线路能够制备出|x>
+            last_loss = None
+            no_better_too_much = 0
+            optimizer = optim.Adam(circ.parameters(), lr=0.1)
+            for i in range(100):
+                state = circ().swapaxes(0, 1)   # [B=1, D=1024]
                 loss = -get_fidelity(state, target)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                print('fidelity:', -loss.item())
-            breakpoint()
-            data_list.append((image, label, encoding_circuit))
+                if i % 10 == 0:
+                    print('fidelity:', -loss.item())
+                if last_loss is not None and np.isclose(last_loss, loss.item(), atol=1e-5):
+                    no_better_too_much += 1
+                if no_better_too_much > 5: break
+                last_loss = loss.item()
+            data_list.append((image, label, circ))
         return data_list
 
 
@@ -313,7 +335,7 @@ if __name__ == '__main__':
 
     # 实例化测试集 QMNISTDataset 并保存为pickle文件
     # 这里取0, 1, 2, 3, 4五个数字，初赛中只需要完成五分类任务
-    #test_dataset = QMNISTDataset(label_list=[0,1,2,3,4], train=False)
-    test_dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False)
+    test_dataset = QMNISTDataset(label_list=[0,1,2,3,4], train=False)
+    #test_dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False)
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'wb') as file:
         pickle.dump(test_dataset, file)

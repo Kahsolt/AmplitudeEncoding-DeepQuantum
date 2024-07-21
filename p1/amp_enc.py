@@ -32,41 +32,41 @@ class AmpTree:
     self.amp = amp
     self.nq = int(np.floor(np.log2(nlen)))
     self.tree: List[List[float]] = None
-    self.tree_sign: List[List[int]] = None
+    self.sign: List[List[float]] = None
     self._build_tree()
 
   def _build_tree(self):
-    def combine_sign(x:int, y:int) -> int:
-      if x < 0 and y < 0: return -1
-      if x == 0 or y == 0: return 0
-      else: return 1
-
     # prob
     tree = []
-    tree_sign = []
+    sign = []
     tree.append([e**2 for e in self.amp])
-    tree_sign.append([int(np.sign(e)) for e in self.amp])
+    sign.append([(1 if e >= 0 else -1) for e in self.amp])
     for _ in range(self.nq):
       base_layer = tree[0]
       up_layer = [base_layer[i] + base_layer[i+1] for i in range(0, len(base_layer), 2)]
       up_layer = to_amp(up_layer)   # renorm to fix accumulating floating error :(
       tree.insert(0, up_layer)
-      base_layer_sign = tree_sign[0]
-      up_layer_sign = [combine_sign(base_layer_sign[i], base_layer_sign[i+1]) for i in range(0, len(base_layer), 2)]
-      tree_sign.insert(0, up_layer_sign)
+      sign_layer = [1 for _ in range(0, len(base_layer), 2)]
+      sign.insert(0, sign_layer)
     # amp
     for l in range(len(tree)):
       layer = tree[l]
       for i in range(len(layer)):
         layer[i] = np.sqrt(layer[i])
+    # fix sign of middle layers
+    for q in range(1, self.nq):
+      for c in range(2**q):
+        ok, sig = self.is_sub_all_eqv(q, c)
+        if ok and sig < 0:
+          sign[q][c] = -1
     self.tree = tree
-    self.tree_sign = tree_sign
+    self.sign = sign
 
   def get_split_RY_angle(self, idx:int, cut:int, eps:float=1e-5) -> float:
     assert idx >= 0 and (cut >= 0 and cut < 2 ** idx), f'idx={idx} cut={cut}'
-    layer      = self.tree     [idx + 1]    # shift by 1
-    layer_sign = self.tree_sign[idx + 1]    # shift by 1
-    sub_prob = [layer[2 * cut]**2, layer[2 * cut + 1]**2]
+    tree = self.tree[idx + 1]    # shift by 1
+    sign = self.sign[idx + 1]    # shift by 1
+    sub_prob = [e**2 for e in tree[2*cut:2*cut+2]]
 
     # case 0: 零概率 no-op
     # case 1: 等概率 |0> + |1> -> tht=1.5707963267948966 -> H
@@ -77,16 +77,15 @@ class AmpTree:
     # arccos(θ/2) = amp, where amp related to |0>
     tht = 2 * np.arccos(sub_amp[0])     # vrng [0, pi]
     # 确定符号 (BUG: ...)
-    sx, sy = layer_sign[2 * cut], layer_sign[2 * cut + 1]
-    if idx != self.nq - 1: return tht
+    sx, sy = sign[2*cut: 2*cut+2]
     # (+, +), [0, pi/2]
-    if   sx >= 0 and sy >= 0: return tht
+    if   sx > 0 and sy > 0: return tht
     # (+, -), [pi/2, pi]
-    elif sx >= 0 and sy  < 0: return tht
+    elif sx > 0 and sy < 0: return -tht
     # (-, -), [pi, 3*pi/2]
-    elif sx  < 0 and sy  < 0: return 2 * np.pi - tht
+    elif sx < 0 and sy < 0: return -2 * np.pi + tht
     # (-, +), [3*pi/2, 2*pi]
-    elif sx  < 0 and sy >= 0: return 2 * np.pi - tht
+    elif sx < 0 and sy > 0: return 2 * np.pi - tht
 
   def is_sub_all_eqv(self, idx:int, cut:int, std_thresh:float=1e-3) -> Tuple[bool, int]:
     assert idx >= 0 and (cut >= 0 and cut < 2 ** idx), f'idx={idx} cut={cut}'
@@ -97,7 +96,7 @@ class AmpTree:
       idx += 1
     ok = np.std(self.amp[cut : cut + nlen]) <= std_thresh
     #if ok: print(self.amp[cut : cut + nlen])
-    return ok, np.sign(self.amp[0])
+    return ok, np.sign(self.amp[cut])
 
   def __getitem__(self, idx:Union[int, tuple]) -> Union[List[float], float]:
     if isinstance(idx, int):
@@ -128,7 +127,7 @@ def gray_code(rank):
   return g
 
 
-def amplitude_encode(amp:List[float], encode:bool=True, eps:float=1e-3, gamma:float=2e-2) -> dq.QubitCircuit:
+def amplitude_encode(amp:List[float], encode:bool=False, eps:float=1e-3, gamma:float=2e-2) -> dq.QubitCircuit:
   at = AmpTree(amp)
   qc = dq.QubitCircuit(nqubit=at.nq)
   isclose = lambda x, y: np.isclose(x, y, atol=eps)
@@ -146,7 +145,10 @@ def amplitude_encode(amp:List[float], encode:bool=True, eps:float=1e-3, gamma:fl
   elif isclose(tht, np.pi/2):
     qc.h(0)
   else:
-    qc.ry(0, tht, encode=encode)
+    #qc.ry(0, tht, encode=encode)
+    g = dq.gate.Ry(nqubit=at.nq, wires=0, requires_grad=True)
+    g.init_para([tht])
+    qc.add(g, encode=encode)
 
   for q in range(1, at.nq):
     mctrl = list(range(q))
@@ -156,7 +158,7 @@ def amplitude_encode(amp:List[float], encode:bool=True, eps:float=1e-3, gamma:fl
       if (q, c) in flag: continue
 
       # 非叶子层且其下叶子全部均权，可剪枝
-      can_trim, sign = at.is_sub_all_eqv(q, c, std_thresh=gamma)
+      can_trim, sig = at.is_sub_all_eqv(q, c, std_thresh=gamma)
       if not is_leaf_layer and can_trim:
         nlen = 1
         cut = c
@@ -172,8 +174,6 @@ def amplitude_encode(amp:List[float], encode:bool=True, eps:float=1e-3, gamma:fl
           if v == '0': qc.x(t)
         for idx in range(q, at.nq):
           qc.h(idx, controls=mctrl, condition=True)
-          if sign < 0:
-            qc.z(idx, controls=mctrl, condition=True)
         for t, v in enumerate(cond):
           if v == '0': qc.x(t)
 
@@ -190,7 +190,10 @@ def amplitude_encode(amp:List[float], encode:bool=True, eps:float=1e-3, gamma:fl
         elif isclose(tht, np.pi/2):
           qc.h(q, controls=mctrl, condition=True)
         else:
-          qc.ry(q, tht, controls=mctrl, condition=True, encode=encode)
+          #qc.ry(q, tht, controls=mctrl, condition=True, encode=encode)
+          g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, condition=True, requires_grad=True)
+          g.init_para([tht])
+          qc.add(g, encode=encode)
         for t, v in enumerate(cond):
           if v == '0': qc.x(t)
 
@@ -211,11 +214,13 @@ def amplitude_encode(amp:List[float], encode:bool=True, eps:float=1e-3, gamma:fl
         j -= 1
     if not cancelled:
       ops_new.append(op)
-  print(f'prune circuit: {len(ops)} -> {len(ops_new)}')
+  #print(f'prune circuit: {len(ops)} -> {len(ops_new)}')
 
   # reconstruct
   qc_new = dq.QubitCircuit(nqubit=at.nq)
-  for op in ops_new: qc_new.add(op)
+  for op in ops_new:
+    op.requires_grad = True
+    qc_new.add(op)
   return qc_new
 
 
@@ -266,6 +271,7 @@ def test_amplitude_encode(amp:List[float], eps:float=1e-3, gamma:float=1e-2) -> 
   state_hat = qc().real.flatten().numpy()
   fidelity = np.abs(state_hat @ state)**2
   print('fidelity:', fidelity)
+  #if fidelity < 0.75: breakpoint()
   return qc
 
 def test_amplitude_encode_mnist(qt:int=None, eps:float=1e-3, gamma:float=1e-2):
@@ -288,18 +294,18 @@ if __name__ == '__main__':
 
   print()
 
-  if not 'test specific':
+  if 'test specific':
     print('test_amplitude_encode_eqv(4)')
     test_amplitude_encode(np.ones(2**4))
     test_amplitude_encode([1,-2,3,3,0,0,0,0])
     test_amplitude_encode([1,2,3,3,0,0,5,6])
     test_amplitude_encode([1,1,1,1,-3,-3,-3,-3])
     test_amplitude_encode([1,1,2,-2,-3,-3,-4,4])
-    breakpoint()
+    test_amplitude_encode([1,-1,-2,-2,3,3,-4,4])
 
   print()
 
-  if not 'test rand':
+  if 'test rand':
     print('test_amplitude_encode_rand(3)')
     for _ in range(30):
       test_amplitude_encode(np.random.uniform(low=-1, high=1, size=2**3))
