@@ -30,6 +30,14 @@ transform = T.Compose([
     T.Normalize((0.1307,), (0.3081,)),
 ])
 
+avg = torch.Tensor([[[0.3081]]])
+std = torch.Tensor([[[0.1307]]])
+
+def normalize(x:Tensor) -> Tensor:
+    return (x - avg) / std
+def denormalize(x:Tensor) -> Tensor:
+    return x * std + avg
+
 
 def count_gates(cir:dq.QubitCircuit) -> int:
     count = 0
@@ -44,10 +52,13 @@ def reshape_norm_padding(x:Tensor) -> Tensor:
     x = x.reshape(x.size(0), -1)
     x = F.normalize(x, p=2, dim=-1)
     x = F.pad(x, (0, 1024 - x.size(1)), mode='constant', value=0)
-    return x.unsqueeze(-1).to(torch.complex64)  # [B, D=1024, C=1]
+    return x.to(torch.complex64)  # [B, D=1024]
 
 
 def get_fidelity(state_pred:Tensor, state_true:Tensor) -> Tensor:
+    # [B, D=1024]
+    assert len(state_pred.shape) == len(state_true.shape) == 2
+    assert state_pred.shape[-1] == 1024
     state_pred = state_pred.view(-1, 1024)
     state_true = state_true.view(-1, 1024)
     fidelity = torch.abs(torch.matmul(state_true.conj(), state_pred.T)) ** 2
@@ -252,16 +263,24 @@ class QMNISTDataset(Dataset):
             # 构建振幅编码线路
             # 随机初始化一个参数化的量子线路来自动学习U_w s.t. U_w|0>=|x>
             encoding_circuit = dq.QubitCircuit(10)
-            encoding_circuit.rylayer()
+            encoding_circuit.ry(0)
+            for i in range(1, 10):
+                for j in range(0, i):
+                    pass
+                    encoding_circuit.ry(i)
+            print('cnt:', count_gates(encoding_circuit))
 
             # 优化rylayer的参数，使得线路能够制备出|x>
+            target = reshape_norm_padding(image.unsqueeze(0))
             optimizer = optim.Adam(encoding_circuit.parameters(), lr=0.1)
             for _ in range(200):
-                state = encoding_circuit()
-                loss = 1 - get_fidelity(state, reshape_norm_padding(image.unsqueeze(0)))
+                state = encoding_circuit().swapaxes(0, 1)   # [B=1, D=1024]
+                loss = -get_fidelity(state, target)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                print('fidelity:', -loss.item())
+            breakpoint()
             data_list.append((image, label, encoding_circuit))
         return data_list
 
@@ -283,7 +302,8 @@ class QMNISTDatasetIdea(QMNISTDataset):   # 理想的振幅编码数据集，用
     def generate_data(self) -> List[Tuple[Tensor, int, DataHolder]]:
         data_list = []
         for image, label in tqdm(self.sub_dataset):
-            data_list.append((image, label, DataHolder(reshape_norm_padding(image.unsqueeze(0)))))
+            target = reshape_norm_padding(image.unsqueeze(0))
+            data_list.append((image, label, DataHolder(target)))
         return data_list
 
 
