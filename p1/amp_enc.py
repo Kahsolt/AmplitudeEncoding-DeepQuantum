@@ -2,6 +2,8 @@
 # Author: Armit
 # Create Time: 2024/07/21 
 
+# DEPRECATED: 该实现有bug已废弃，请参考 amp_enc2.py
+
 from typing import List, Union, Tuple
 
 import torch

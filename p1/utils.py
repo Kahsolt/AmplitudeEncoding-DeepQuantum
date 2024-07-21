@@ -57,8 +57,8 @@ def reshape_norm_padding(x:Tensor) -> Tensor:
 
 def get_fidelity(state_pred:Tensor, state_true:Tensor) -> Tensor:
     # [B, D=1024]
-    assert len(state_pred.shape) == len(state_true.shape) == 2
-    assert state_pred.shape[-1] == 1024
+    #assert len(state_pred.shape) == len(state_true.shape) == 2
+    #assert state_pred.shape[-1] == 1024
     state_pred = state_pred.view(-1, 1024)
     state_true = state_true.view(-1, 1024)
     fidelity = torch.abs(torch.matmul(state_true.conj(), state_pred.T)) ** 2
@@ -258,14 +258,19 @@ class QMNISTDataset(Dataset):
 
     def generate_data(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
         """ a list of tuples (原始经典数据, 标签, 振幅编码量子线路)=(image, label, encoding_circuit) """
-        from amp_enc import amplitude_encode
+        from amp_enc2 import amplitude_encode
 
         data_list = []
         for image, label in tqdm(self.sub_dataset):
             # 超参数
+            N_ITER = 0
+            # 振幅接近的误差阈值，可将 RY 近似为 H
             EPS = 0.001
-            GAMMA = 0.02
-            QT = 32
+            # 振幅接近的误差阈值，可将一组相近振幅近似为 H*
+            # H*分组的方差容许范围, 越小精度越高但需要的门越多 (不能超过 0.02)
+            GAMMA = 0.016
+            # 像素重采样量化数
+            QT = None
 
             # 原始数据
             x: Tensor = image                               # [1, 28, 28]
@@ -277,21 +282,24 @@ class QMNISTDataset(Dataset):
                 x = denormalize(x)
                 vmin, vmax = x.min(), x.max()
                 x = (x - vmin) / (vmax - vmin)
-                x = ((x * 255 / QT).round() * QT) / 255
+                nq = 256 // QT
+                x = ((x * 255 / nq).round() * nq) / 255
                 x = x * (vmax - vmin) + vmin
                 x = normalize(x)
                 target_approx = reshape_norm_padding(x.unsqueeze(0))
+                #print('fid_approx:', get_fidelity(target_approx, target).item())
 
             # 构建振幅编码线路
             circ = amplitude_encode(target_approx[0].real.numpy().tolist(), eps=EPS, gamma=GAMMA)
-            print('gate count:', count_gates(circ))
-            print('param count:', sum([p.numel() for p in circ.parameters()]))
+            #print('gate count:', count_gates(circ))
+            #print('param count:', sum([p.numel() for p in circ.parameters()]))
 
             # 优化参数，使得线路能够制备出|x>
-            last_loss = None
-            no_better_too_much = 0
-            optimizer = optim.Adam(circ.parameters(), lr=0.1)
-            for i in range(100):
+            if N_ITER > 0:
+                last_loss = None
+                no_better_too_much = 0
+                optimizer = optim.Adam(circ.parameters(), lr=0.05)
+            for i in range(N_ITER):
                 state = circ().swapaxes(0, 1)   # [B=1, D=1024]
                 loss = -get_fidelity(state, target)
                 optimizer.zero_grad()

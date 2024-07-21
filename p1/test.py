@@ -71,8 +71,10 @@ if __name__ == '__main__':
     # 数据集
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
         test_dataset = pickle.load(file)
+    print('>> load pickle done')
     if not validate_test_dataset(test_dataset):
         raise RuntimeError('>> Error: test_dataset is not valid')
+    print('>> check dataset done')
 
     # 模型
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)
@@ -80,6 +82,7 @@ if __name__ == '__main__':
         model_config = pickle.load(file)
     model = QuantumNeuralNetwork(**model_config)
     model.load_state_dict(torch.load(f'{OUTPUT_DIR}/best_model.pt', map_location=torch.device('cpu')))
+    print('>> load model done')
 
     # 模型理智检查
     if not 'sanity check':
