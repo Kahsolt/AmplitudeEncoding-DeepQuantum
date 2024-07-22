@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import torch.nn as nn
+import torch.nn.functional as F
 from torch import Tensor
 from torch.utils.data import DataLoader
 import deepquantum as dq
@@ -16,7 +17,7 @@ class QuantumNeuralNetwork(nn.Module):
         super().__init__()
         self.n_qubit = n_qubit
         self.n_layer = n_layer
-        self.loss_fn =  nn.CrossEntropyLoss()
+        self.loss_fn = F.cross_entropy
         self.create_var_circuit()
 
     def create_var_circuit(self):

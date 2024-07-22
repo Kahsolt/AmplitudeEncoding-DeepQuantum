@@ -6,12 +6,27 @@ import pickle
 
 import torch
 from torch import optim
+from torch import Tensor
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 from model import QuantumNeuralNetwork
 from utils import QMNISTDataset, QMNISTDatasetIdea, cir_collate_fn
+from utils import denormalize, normalize, reshape_norm_padding
+
+
+def qt_z(z:Tensor, qt:int=2) -> Tensor:
+    nq = 256 // qt
+    z: Tensor = denormalize(z.real)
+    vmin, _ = z.min(-1, keepdim=True)
+    vmax, _ = z.max(-1, keepdim=True)
+    z = (z - vmin) / (vmax - vmin)
+    z = ((z * 255 / nq).round() * nq) / 255
+    z = z * (vmax - vmin) + vmin
+    z = normalize(z)
+    z = reshape_norm_padding(z)
+    return z
 
 
 def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loader:DataLoader, valid_loader:DataLoader, num_epochs:int, output_dir:str, patience=10, device='cpu'):
@@ -64,6 +79,8 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
         inner_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}', leave=False, position=1)
         for x, y, z in inner_pbar:
             x, y, z = x.to(device), y.to(device), z.to(device)
+            z = qt_z(z)
+
             optimizer.zero_grad()
             loss, output = model(z, y)
             loss.backward()

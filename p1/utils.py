@@ -34,8 +34,14 @@ avg = torch.Tensor([[[0.3081]]])
 std = torch.Tensor([[[0.1307]]])
 
 def normalize(x:Tensor) -> Tensor:
+    global avg, std
+    avg = avg.to(x.device)
+    std = std.to(x.device)
     return (x - avg) / std
 def denormalize(x:Tensor) -> Tensor:
+    global avg, std
+    avg = avg.to(x.device)
+    std = std.to(x.device)
     return x * std + avg
 
 
