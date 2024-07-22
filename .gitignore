@@ -6,9 +6,13 @@ __pycache__/
 thesis/*
 !thesis/*.cmd
 
+# data
+data/
+
 # generated
 gen/
 out/
+submit/
 
 # logs
 log/

@@ -1,112 +1,170 @@
 #!/usr/bin/env python3
 # Author: Armit
-# Create Time: 2024/07/21 
+# Create Time: 2024/07/22 
 
-# DEPRECATED: 该实现有bug已废弃，请参考 amp_enc2.py
+from dataclasses import dataclass
+from typing import List, Tuple
 
-from typing import List, Union, Tuple
-
-import torch
 import numpy as np
 import deepquantum as dq
 from utils import count_gates, QMNISTDatasetIdea, normalize, denormalize, reshape_norm_padding
 
 
-class AmpTree:
+def to_amp(coeffs:List[float]) -> List[float]:
+  amp = np.asarray(coeffs)
+  amp = amp / np.linalg.norm(amp)
+  return amp.tolist()
 
-  '''
-  概率幅分配二叉树：
-    1                     |  ctrl_bit
-    |     \               |
-    0.7        0.3        |     - 
-    |  \       |  \       |
-    0.2  0.5   0.1  0.2   |  highest(1)
-  -------------------------------------
-    |    |     |    |
-  -√0.2 √0.5 -√0.1 √0.2   <- 各项振幅 (带符号)
-  '''
+def sign(x:int):
+  if x == 0: return  0
+  if x  > 0: return  1
+  if x  < 0: return -1
 
-  def __init__(self, amp:List[float]):
-    nlen = len(amp)
+
+@dataclass
+class Node:
+  type: str   # ['RY', 'I', 'X', 'H', 'H*', '-', None]
+  val: float
+  sig: int
+  flag: bool = False
+
+  @property
+  def is_leaf(self):
+    return self.type is None
+  
+  def __repr__(self):
+    return f'<{self.type} v={self.val:.4f} s={self.sig} f={int(self.flag)}>'
+
+
+class AmpTreeEx:
+
+  def __init__(self, coeff:List[float], eps:float=1e-3, gamma:float=0.01):
+
+    nlen = len(coeff)
     assert nlen & (nlen - 1) == 0, 'coeff length is not power of 2'
-    assert np.isclose(sum([e**2 for e in amp]), 1.0)
+    amp = to_amp(coeff)
+    assert np.isclose(np.linalg.norm(amp), 1.0)
 
     self.amp = amp
+    self.eps = eps
+    self.gamma = gamma
     self.nq = int(np.floor(np.log2(nlen)))
-    self.tree: List[List[float]] = None
-    self.sign: List[List[float]] = None
+    self.tree: List[List[Node]] = None
     self._build_tree()
+    self._override_H_star_recursive(0, len(self.amp))
 
   def _build_tree(self):
-    # prob
-    tree = []
-    sign = []
-    tree.append([e**2 for e in self.amp])
-    sign.append([(1 if e >= 0 else -1) for e in self.amp])
+    isclose = lambda x, y: np.isclose(x, y, atol=self.eps)
+
+    tree: List[List[Node]] = []
+    tree.append([Node(None, abs(e), sign(e)) for e in self.amp])
     for _ in range(self.nq):
+      # renorm
       base_layer = tree[0]
-      up_layer = [base_layer[i] + base_layer[i+1] for i in range(0, len(base_layer), 2)]
-      up_layer = to_amp(up_layer)   # renorm to fix accumulating floating error :(
+      vals = to_amp([n.val for n in base_layer])
+      for i, n in enumerate(base_layer):
+        n.val = vals[i]
+      # re-distro
+      up_layer: List[Node] = []
+      for i in range(0, len(base_layer), 2):
+        x = base_layer[i]
+        y = base_layer[i+1]
+        x_is_0 = isclose(x.val, 0)
+        y_is_0 = isclose(y.val, 0)
+        val_sum = np.sqrt(x.val**2 + y.val**2)
+        if x_is_0 and y_is_0:
+          node = Node('-', 0, 1)
+        elif y_is_0:
+          node = Node('I', x.val, x.sig)
+        elif x_is_0:
+          node = Node('X', y.val, y.sig)
+        elif isclose(x.val, y.val) and x.sig == y.sig:
+          node = Node('H', val_sum, x.sig)
+        else:
+          node = Node('RY', val_sum, 1)
+        up_layer.append(node)
       tree.insert(0, up_layer)
-      sign_layer = [1 for _ in range(0, len(base_layer), 2)]
-      sign.insert(0, sign_layer)
-    # amp
-    for l in range(len(tree)):
-      layer = tree[l]
-      for i in range(len(layer)):
-        layer[i] = np.sqrt(layer[i])
-    # fix sign of middle layers
-    for q in range(1, self.nq):
-      for c in range(2**q):
-        ok, sig = self.is_sub_all_eqv(q, c)
-        if ok and sig < 0:
-          sign[q][c] = -1
     self.tree = tree
-    self.sign = sign
 
-  def get_split_RY_angle(self, idx:int, cut:int, eps:float=1e-5) -> float:
-    assert idx >= 0 and (cut >= 0 and cut < 2 ** idx), f'idx={idx} cut={cut}'
-    tree = self.tree[idx + 1]    # shift by 1
-    sign = self.sign[idx + 1]    # shift by 1
-    sub_prob = [e**2 for e in tree[2*cut:2*cut+2]]
+  def _override_H_star_recursive(self, L:int, R:int):
+    ''' 尝试把一棵子树的根替换为 H* 节点，并重置子节点类型、直接标记为已完成 '''
+    if np.std(self.amp[L:R]) <= self.gamma:
+      layer = self.nq
+      nlen = R - L + 1
+      rank = L
+      while nlen > 1:
+        layer -= 1
+        nlen //= 2
+        rank //= 2
+      node = self.tree[layer][rank]
+      node.type = 'H*'
+      node.sig = sign(np.mean(self.amp[L:R]))
+      self.reset_H_star_children(layer, rank)
+    else:
+      M = (L + R) // 2
+      if L + 1 < M: self._override_H_star_recursive(L, M)
+      if M < R - 1: self._override_H_star_recursive(M, R)
 
-    # case 0: 零概率 no-op
-    # case 1: 等概率 |0> + |1> -> tht=1.5707963267948966 -> H
-    # case 2: 不等概率，两个极端 |0> -> tht=0 -> I, |1> -> tht=pi -> X
-    sub_prob_sum = sum(sub_prob)
-    if abs(sub_prob_sum) < eps: return 0
-    sub_amp = [np.sqrt(e / sub_prob_sum) for e in sub_prob]
-    # arccos(θ/2) = amp, where amp related to |0>
-    tht = 2 * np.arccos(sub_amp[0])     # vrng [0, pi]
-    # 确定符号 (BUG: ...)
-    sx, sy = sign[2*cut: 2*cut+2]
-    # (+, +), [0, pi/2]
-    if   sx > 0 and sy > 0: return tht
-    # (+, -), [pi/2, pi]
-    elif sx > 0 and sy < 0: return -tht
-    # (-, -), [pi, 3*pi/2]
-    elif sx < 0 and sy < 0: return -2 * np.pi + tht
-    # (-, +), [3*pi/2, 2*pi]
-    elif sx < 0 and sy > 0: return 2 * np.pi - tht
+  def reset_H_star_children(self, layer:int, rank:int):
+    try:
+      l, r = layer + 1, rank * 2
+      lchild = self.tree[l][r]
+      lchild.type = '-'
+      lchild.flag = True
+      self.reset_H_star_children(l, r)
+    except IndexError: pass
+    try:
+      l, r = layer + 1, rank * 2 + 1
+      rchild = self.tree[l][r]
+      rchild.type = '-'
+      rchild.flag = True
+      self.reset_H_star_children(l, r)
+    except IndexError: pass
 
-  def is_sub_all_eqv(self, idx:int, cut:int, std_thresh:float=1e-3) -> Tuple[bool, int]:
-    assert idx >= 0 and (cut >= 0 and cut < 2 ** idx), f'idx={idx} cut={cut}'
-    nlen = 1              # 覆盖区间长度
-    while idx < self.nq:  # 下沉
-      cut *= 2
-      nlen *= 2
-      idx += 1
-    ok = np.std(self.amp[cut : cut + nlen]) <= std_thresh
-    #if ok: print(self.amp[cut : cut + nlen])
-    return ok, np.sign(self.amp[cut])
+  def mark_H_star_childs(self):
+    ''' 若父节点被标记为 H*，把所有子节点重置为 - 节点 '''
+    pass
 
-  def __getitem__(self, idx:Union[int, tuple]) -> Union[List[float], float]:
-    if isinstance(idx, int):
-      return self.tree[idx]
-    if isinstance(idx, tuple):
-      assert len(idx) == 2
-      layer, colum = idx
-      return self.tree[layer][colum]
+  def process_node(self, layer:int, rank:int) -> Tuple[str, float]:
+    assert (0 <= layer < self.nq) and (0 <= rank < 2 ** layer), f'invalid layer={layer} rank={rank}'
+    root   = self.tree[layer]    [rank]
+    lchild = self.tree[layer + 1][rank * 2]
+    rchild = self.tree[layer + 1][rank * 2 + 1]
+    if root.flag: return None, None   # have done!
+    root.flag = True
+
+    if root.type == '-':   # case 0: 零概率 no-op
+      return None, None
+    if root.type == 'I':   # case 1: 默认基态 no-op
+      return None, None
+    if root.type == 'X':   # case 2: 基态翻转
+      return 'X', None
+    if root.type == 'H':   # case 3: 等概率
+      return 'H', None
+    if root.type == 'RY':  # case 4: 不等概率
+      x, y = to_amp([lchild.val, rchild.val])
+      sx, sy = lchild.sig, rchild.sig
+      # x|0>+y|1>, x=arccos(θ/2)
+      tht = 2 * np.arccos(x)  # vrng [0, pi]
+      '''
+        (+, +)  [0, pi/2]
+        (+, -)  [pi/2, pi]
+        (-, -)  [pi, 3*pi/2]
+        (-, +)  [3*pi/2, 2*pi]
+      '''
+      if   sx > 0 and sy > 0: return 'RY', tht
+      elif sx > 0 and sy < 0: return 'RY', -tht
+      elif sx < 0 and sy < 0: return 'RY', tht - 2 * np.pi
+      elif sx < 0 and sy > 0: return 'RY', 2 * np.pi - tht
+    if root.type == 'H*':  # case 3: 近似等概率递归
+      return 'H*', list(range(layer, self.nq))
+
+    raise TypeError(f'>> bad root type: {root.type}')
+
+  def print_tree(self, include_leaf:bool=False):
+    for q in range(self.nq + int(include_leaf)):
+      print(self.tree[q])
+    print()
 
 
 # ~pennylane.templates.state_preparations.mottonen.py
@@ -129,75 +187,52 @@ def gray_code(rank):
   return g
 
 
-def amplitude_encode(amp:List[float], encode:bool=False, eps:float=1e-3, gamma:float=2e-2) -> dq.QubitCircuit:
-  at = AmpTree(amp)
+def amplitude_encode(amp:List[float], encode:bool=False, eps:float=1e-3, gamma:float=0.01, limit_depth:int=-1) -> dq.QubitCircuit:
+  at = AmpTreeEx(amp, eps, gamma)
   qc = dq.QubitCircuit(nqubit=at.nq)
-  isclose = lambda x, y: np.isclose(x, y, atol=eps)
-
-  # tree visit mark
-  flag: List = []
 
   # divide-and-conquer
-  tht = at.get_split_RY_angle(0, 0)
-  flag.append((0, 0)) # 标记
-  if abs(tht) < eps:
-    pass
-  elif isclose(abs(tht), np.pi):
-    qc.x(0)
-  elif isclose(tht, np.pi/2):
-    qc.h(0)
-  else:
-    #qc.ry(0, tht, encode=encode)
+  name, args = at.process_node(0, 0)
+  if name is None: pass
+  elif name == 'X': qc.x(0)
+  elif name == 'H': qc.h(0)
+  elif name == 'RY':
     g = dq.gate.Ry(nqubit=at.nq, wires=0, requires_grad=True)
-    g.init_para([tht])
+    g.init_para([args])
     qc.add(g, encode=encode)
+  elif name == 'H*':
+    for q in args:
+      qc.h(q)
+  else: raise TypeError(name, args)
 
   for q in range(1, at.nq):
+    if limit_depth > 0 and q >= limit_depth: break
     mctrl = list(range(q))
-    is_leaf_layer = q == at.nq - 1
     for cond in gray_code(q):
       c = int(cond, base=2)
-      if (q, c) in flag: continue
+      name, args = at.process_node(q, c)
+      if name is None: continue
 
-      # 非叶子层且其下叶子全部均权，可剪枝
-      can_trim, sig = at.is_sub_all_eqv(q, c, std_thresh=gamma)
-      if not is_leaf_layer and can_trim:
-        nlen = 1
-        cut = c
-        idx = q
-        while idx < at.nq:  # 子代全部标记
-          for cc in range(cut, cut + nlen):
-            flag.append((idx, cc))
-          cut *= 2
-          nlen *= 2
-          idx += 1
-
-        for t, v in enumerate(cond):
-          if v == '0': qc.x(t)
-        for idx in range(q, at.nq):
-          qc.h(idx, controls=mctrl, condition=True)
-        for t, v in enumerate(cond):
-          if v == '0': qc.x(t)
-
-      # 其下叶子非均权
+      # cond
+      for t, v in enumerate(cond):
+        if v == '0': qc.x(t)
+      # mctrl-rot
+      if name == 'X':
+        qc.x(q, controls=mctrl, condition=True)
+      elif name == 'H':
+        qc.h(q, controls=mctrl, condition=True)
+      elif name == 'RY':
+        g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, condition=True, requires_grad=True)
+        g.init_para([args])
+        qc.add(g, encode=encode)
+      elif name == 'H*':
+        for qq in args:
+          qc.h(qq, controls=mctrl, condition=True)
       else:
-        tht = at.get_split_RY_angle(q, c)
-        flag.append((q, c)) # 标记
-        if abs(tht) < eps: continue
-
-        for t, v in enumerate(cond):
-          if v == '0': qc.x(t)
-        if isclose(abs(tht), np.pi):
-          qc.x(q, controls=mctrl, condition=True)
-        elif isclose(tht, np.pi/2):
-          qc.h(q, controls=mctrl, condition=True)
-        else:
-          #qc.ry(q, tht, controls=mctrl, condition=True, encode=encode)
-          g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, condition=True, requires_grad=True)
-          g.init_para([tht])
-          qc.add(g, encode=encode)
-        for t, v in enumerate(cond):
-          if v == '0': qc.x(t)
+        raise TypeError(name, args)
+      # uncond
+      for t, v in enumerate(cond):
+        if v == '0': qc.x(t)
 
   # cancel inverses X gate
   ops = qc.operators
@@ -226,54 +261,14 @@ def amplitude_encode(amp:List[float], encode:bool=False, eps:float=1e-3, gamma:f
   return qc_new
 
 
-def to_amp(coeffs:List[float]) -> List[float]:
-  amp = np.asarray(coeffs)
-  amp = amp / np.linalg.norm(amp)
-  return amp.tolist()
-
-
-def test_amp_tree():
-  amp = [-np.sqrt(0.2), np.sqrt(0.5), -np.sqrt(0.1), np.sqrt(0.2)]
-  print('amp:', amp)
-  at = AmpTree(amp)
-  print('tree:')
-  for layer in at.tree:
-    print(layer)
-  print('sign(amp):', at.amp_sign)
-
-  print('at[2]:', at[2])
-  print('at[2,1]:', at[2, 1])
-  print()
-
-  tht00 = at.get_split_RY_angle(0, 0)
-  tht10 = at.get_split_RY_angle(1, 0)
-  tht11 = at.get_split_RY_angle(1, 1)
-  print('tht00:', tht00)
-  print('tht10:', tht10)
-  print('tht11:', tht11)
-  print()
-
-  circ = dq.QubitCircuit(nqubit=2)
-  circ.ry(0, tht00)
-  circ.x(0)
-  circ.ry(1, tht10, controls=0, condition=True)
-  circ.x(0)
-  circ.ry(1, tht11, controls=0, condition=True)
-  print('state:', circ().real.flatten())
-
-  qc = amplitude_encode(amp)
-  print('state:', qc().real.flatten())
-  assert torch.allclose(circ(), qc())
-
-
 def test_amplitude_encode(amp:List[float], eps:float=1e-3, gamma:float=1e-2) -> dq.QubitCircuit:
   state = amp / np.linalg.norm(amp)
   qc = amplitude_encode(state, eps=eps, gamma=gamma)
   print('gate count:', count_gates(qc))
-  state_hat = qc().real.flatten().numpy()
+  state_hat = qc().detach().real.flatten().numpy()
   fidelity = np.abs(state_hat @ state)**2
   print('fidelity:', fidelity)
-  #if fidelity < 0.75: breakpoint()
+  if fidelity < 0.75: breakpoint()
   return qc
 
 def test_amplitude_encode_mnist(qt:int=None, eps:float=1e-3, gamma:float=1e-2):
@@ -286,18 +281,20 @@ def test_amplitude_encode_mnist(qt:int=None, eps:float=1e-3, gamma:float=1e-2):
       x = normalize(x)
       state = reshape_norm_padding(x.unsqueeze(0)).real.flatten().numpy().tolist()
     else:
-      state = z().real.flatten().numpy()
+      state = z().detach().real.flatten().numpy()
     test_amplitude_encode(state, eps=eps, gamma=gamma)
 
 
 if __name__ == '__main__':
-  if not 'test sanity':
-    test_amp_tree()
+  if not 'test AmpTreeEx':
+    AmpTreeEx(np.ones(2**4)).print_tree()
+    AmpTreeEx([1,-2,3,3,0,0,0,0]).print_tree()
+    AmpTreeEx([1,2,3,3,0,0,5,6]).print_tree()
+    AmpTreeEx([1,1,1,1,-3,-3,-3,-3]).print_tree()
+    AmpTreeEx([1,1,2,-2,-3,-3,-4,4]).print_tree()
+    AmpTreeEx([1,-1,-2,-2,3,3,-4,4]).print_tree()
 
-  print()
-
-  if 'test specific':
-    print('test_amplitude_encode_eqv(4)')
+  if not 'test amplitude encode':
     test_amplitude_encode(np.ones(2**4))
     test_amplitude_encode([1,-2,3,3,0,0,0,0])
     test_amplitude_encode([1,2,3,3,0,0,5,6])
@@ -305,13 +302,10 @@ if __name__ == '__main__':
     test_amplitude_encode([1,1,2,-2,-3,-3,-4,4])
     test_amplitude_encode([1,-1,-2,-2,3,3,-4,4])
 
-  print()
-
   if 'test rand':
-    print('test_amplitude_encode_rand(3)')
+    print('test_amplitude_encode_rand(4)')
     for _ in range(30):
-      test_amplitude_encode(np.random.uniform(low=-1, high=1, size=2**3))
-    # 9197 -> 2059
+      test_amplitude_encode(np.random.uniform(low=-1, high=1, size=2**4))
     print('test_amplitude_encode_rand(10)')
     test_amplitude_encode(np.random.uniform(low=-1, high=1, size=2**10))
 

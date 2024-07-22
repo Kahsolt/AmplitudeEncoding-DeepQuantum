@@ -1,6 +1,8 @@
 import os
+import sys
 import random
 import pickle
+from pathlib import Path
 from typing import List, Tuple, Dict
 
 import torch
@@ -22,6 +24,12 @@ if 'fix seed':
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
 
+BASE_PATH = Path(__file__).parent
+
+if sys.platform == 'win32':
+    DATA_PATH = BASE_PATH.parent / 'data'
+else:
+    DATA_PATH = '/data'
 
 # MNIST preprocess
 # https://gist.github.com/kdubovikov/eb2a4c3ecadd5295f68c126542e59f0a
@@ -168,7 +176,7 @@ class MNISTDataset(Dataset):
             size (int): 数据集的大小
         """
 
-        self.dataset = MNIST(root='./data', train=train, download=True, transform=transform)
+        self.dataset = MNIST(root=DATA_PATH, train=train, download=True, transform=transform)
 
         # 构造原始标签到顺序标签的映射字典
         self.label_map = {}
@@ -207,7 +215,7 @@ class QMNISTDataset(Dataset):
             size (int): 数据集的大小
         """
 
-        self.dataset = MNIST(root='./data', train=train, download=True, transform=transform)
+        self.dataset = MNIST(root=DATA_PATH, train=train, download=True, transform=transform)
 
         # 构造原始标签到顺序标签的映射字典
         self.label_map = {}
@@ -264,7 +272,7 @@ class QMNISTDataset(Dataset):
 
     def generate_data(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
         """ a list of tuples (原始经典数据, 标签, 振幅编码量子线路)=(image, label, encoding_circuit) """
-        from amp_enc2 import amplitude_encode
+        from amp_enc import amplitude_encode
 
         data_list = []
         for image, label in tqdm(self.sub_dataset):
