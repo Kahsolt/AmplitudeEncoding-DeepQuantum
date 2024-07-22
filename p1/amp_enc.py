@@ -2,7 +2,9 @@
 # Author: Armit
 # Create Time: 2024/07/22 
 
+import math
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import List, Tuple
 
 import numpy as np
@@ -11,15 +13,15 @@ from utils import count_gates, QMNISTDatasetIdea, normalize, denormalize, reshap
 
 
 def to_amp(coeffs:List[float]) -> List[float]:
-  amp = np.asarray(coeffs)
-  amp = amp / np.linalg.norm(amp)
-  return amp.tolist()
+  n = np.linalg.norm(coeffs)
+  return [e / n for e in coeffs]
 
 def sign(x:int):
   if x == 0: return  0
   if x  > 0: return  1
   if x  < 0: return -1
 
+mean = lambda x: sum(x) / len(x)
 
 @dataclass
 class Node:
@@ -39,22 +41,21 @@ class Node:
 class AmpTreeEx:
 
   def __init__(self, coeff:List[float], eps:float=1e-3, gamma:float=0.01):
-
     nlen = len(coeff)
     assert nlen & (nlen - 1) == 0, 'coeff length is not power of 2'
     amp = to_amp(coeff)
-    assert np.isclose(np.linalg.norm(amp), 1.0)
+    assert abs(np.linalg.norm(amp) - 1.0) < eps
 
     self.amp = amp
     self.eps = eps
     self.gamma = gamma
-    self.nq = int(np.floor(np.log2(nlen)))
+    self.nq = int(math.floor(math.log2(nlen)))
     self.tree: List[List[Node]] = None
     self._build_tree()
     self._override_H_star_recursive(0, len(self.amp))
 
   def _build_tree(self):
-    isclose = lambda x, y: np.isclose(x, y, atol=self.eps)
+    isclose = lambda x, y: abs(x - y) < self.eps
 
     tree: List[List[Node]] = []
     tree.append([Node(None, abs(e), sign(e)) for e in self.amp])
@@ -71,7 +72,7 @@ class AmpTreeEx:
         y = base_layer[i+1]
         x_is_0 = isclose(x.val, 0)
         y_is_0 = isclose(y.val, 0)
-        val_sum = np.sqrt(x.val**2 + y.val**2)
+        val_sum = math.sqrt(x.val**2 + y.val**2)
         if x_is_0 and y_is_0:
           node = Node('-', 0, 1)
         elif y_is_0:
@@ -98,7 +99,7 @@ class AmpTreeEx:
         rank //= 2
       node = self.tree[layer][rank]
       node.type = 'H*'
-      node.sig = sign(np.mean(self.amp[L:R]))
+      node.sig = sign(mean(self.amp[L:R]))
       self.reset_H_star_children(layer, rank)
     else:
       M = (L + R) // 2
@@ -121,10 +122,6 @@ class AmpTreeEx:
       self.reset_H_star_children(l, r)
     except IndexError: pass
 
-  def mark_H_star_childs(self):
-    ''' 若父节点被标记为 H*，把所有子节点重置为 - 节点 '''
-    pass
-
   def process_node(self, layer:int, rank:int) -> Tuple[str, float]:
     assert (0 <= layer < self.nq) and (0 <= rank < 2 ** layer), f'invalid layer={layer} rank={rank}'
     root   = self.tree[layer]    [rank]
@@ -145,7 +142,7 @@ class AmpTreeEx:
       x, y = to_amp([lchild.val, rchild.val])
       sx, sy = lchild.sig, rchild.sig
       # x|0>+y|1>, x=arccos(θ/2)
-      tht = 2 * np.arccos(x)  # vrng [0, pi]
+      tht = 2 * math.acos(x)  # vrng [0, pi]
       '''
         (+, +)  [0, pi/2]
         (+, -)  [pi/2, pi]
@@ -154,8 +151,8 @@ class AmpTreeEx:
       '''
       if   sx > 0 and sy > 0: return 'RY', tht
       elif sx > 0 and sy < 0: return 'RY', -tht
-      elif sx < 0 and sy < 0: return 'RY', tht - 2 * np.pi
-      elif sx < 0 and sy > 0: return 'RY', 2 * np.pi - tht
+      elif sx < 0 and sy < 0: return 'RY', tht - 2 * math.pi
+      elif sx < 0 and sy > 0: return 'RY', 2 * math.pi - tht
     if root.type == 'H*':  # case 3: 近似等概率递归
       return 'H*', list(range(layer, self.nq))
 
@@ -168,6 +165,7 @@ class AmpTreeEx:
 
 
 # ~pennylane.templates.state_preparations.mottonen.py
+@lru_cache
 def gray_code(rank):
   """Generates the Gray code of given rank.
   Args:
@@ -266,7 +264,7 @@ def test_amplitude_encode(amp:List[float], eps:float=1e-3, gamma:float=1e-2) -> 
   qc = amplitude_encode(state, eps=eps, gamma=gamma)
   print('gate count:', count_gates(qc))
   state_hat = qc().detach().real.flatten().numpy()
-  fidelity = np.abs(state_hat @ state)**2
+  fidelity = abs(state_hat @ state)**2
   print('fidelity:', fidelity)
   if fidelity < 0.75: breakpoint()
   return qc
@@ -311,7 +309,7 @@ if __name__ == '__main__':
 
   print()
 
-  if 'test dataset':
+  if not 'test dataset':
     print('test_amplitude_encode_mnist()')
     test_amplitude_encode_mnist(qt=None)
     test_amplitude_encode_mnist(qt=4)

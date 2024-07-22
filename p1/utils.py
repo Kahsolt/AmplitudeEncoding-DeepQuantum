@@ -270,7 +270,7 @@ class QMNISTDataset(Dataset):
             gates_count += count_gates(encoding_cir)
         return gates_count / len(self.data_list)
 
-    def generate_data(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
+    def generate_data_AmpEnc(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
         """ a list of tuples (原始经典数据, 标签, 振幅编码量子线路)=(image, label, encoding_circuit) """
         from amp_enc import amplitude_encode
 
@@ -285,10 +285,13 @@ class QMNISTDataset(Dataset):
             GAMMA = 0.016
             # 像素重采样量化数
             QT = None
+            # 翻转向量顺序 (尾填充零的放在前面)
+            X_FLIP = False
 
             # 原始数据
             x: Tensor = image                               # [1, 28, 28]
             target = reshape_norm_padding(x.unsqueeze(0))   # [1, 1024]
+            if X_FLIP: target = target.flip(-1)
 
             # 目标编码向量
             target_approx = target
@@ -321,10 +324,38 @@ class QMNISTDataset(Dataset):
                 optimizer.step()
                 if i % 10 == 0:
                     print('fidelity:', -loss.item())
-                if last_loss is not None and np.isclose(last_loss, loss.item(), atol=1e-5):
+                if last_loss is not None and abs(last_loss - loss.item()) <= 1e-5:
                     no_better_too_much += 1
                 if no_better_too_much > 5: break
                 last_loss = loss.item()
+            data_list.append((image, label, circ))
+        return data_list
+
+    def generate_data(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
+        from train_single import get_model
+
+        data_list = []
+        for image, label in tqdm(self.sub_dataset):
+            # 超参数
+            N_ITER = 1000
+
+            # 原始数据
+            x: Tensor = image                               # [1, 28, 28]
+            target = reshape_norm_padding(x.unsqueeze(0))   # [1, 1024]
+
+            circ = get_model()
+            optimizer = optim.Adam(circ.parameters(), lr=0.02)
+            for i in range(N_ITER):
+                state = circ().swapaxes(0, 1)     # [B=1, D=1024]
+                loss = -get_fidelity(state, target)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                if i % 100 == 0:
+                    print('fid:', -loss.item())
+            state = circ().swapaxes(0, 1)
+            print(f'>> Fidelity:', get_fidelity(state, target).item())
+
             data_list.append((image, label, circ))
         return data_list
 
@@ -346,7 +377,11 @@ class QMNISTDatasetIdea(QMNISTDataset):   # 理想的振幅编码数据集，用
     def generate_data(self) -> List[Tuple[Tensor, int, DataHolder]]:
         data_list = []
         for image, label in tqdm(self.sub_dataset):
+            # 翻转向量顺序 (尾填充零的放在前面)
+            X_FLIP = False
+
             target = reshape_norm_padding(image.unsqueeze(0))
+            if X_FLIP: target = target.flip(-1)
             data_list.append((image, label, DataHolder(target)))
         return data_list
 
