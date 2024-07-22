@@ -6,7 +6,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader
 import deepquantum as dq
 
-from utils import QMNISTDataset, cir_collate_fn, get_fidelity, reshape_norm_padding
+from utils import QMNISTDataset, cir_collate_fn, get_fidelity, reshape_norm_padding, count_gates
 
 
 # 注意: 选手的模型名字必须固定为 QuantumNeuralNetwork
@@ -23,12 +23,146 @@ class QuantumNeuralNetwork(nn.Module):
     def create_var_circuit(self):
         """构建变分量子线路"""
         self.var_circuit = dq.QubitCircuit(self.n_qubit)
-        for i in range(self.n_layer):
+
+        if not 'original':          # 89.333% 有点过拟合
+            for i in range(self.n_layer):
+                self.var_circuit.rzlayer()      # 换成 u3layer 区别不大
+                self.var_circuit.rylayer()
+                self.var_circuit.rzlayer()
+                self.var_circuit.cnot_ring()    # 换成 cxlayer 将很差 ~35%
+                self.var_circuit.barrier()
+
+        if not 'original-seq':      # 90.133%
+            for i in range(self.n_layer):
+                for q in range(self.n_qubit):
+                    self.var_circuit.rz(wires=q)
+                    self.var_circuit.ry(wires=q)
+                    self.var_circuit.rz(wires=q)
+                    self.var_circuit.cnot(q, (q+1)%self.n_qubit)
+
+        if not 'HAE-cyclic':        # 88.133%
+            for i in range(self.n_layer):
+                self.var_circuit.rzlayer()
+                self.var_circuit.rylayer()
+                self.var_circuit.rzlayer()
+                self.var_circuit.cnot_ring()
             self.var_circuit.rzlayer()
             self.var_circuit.rylayer()
             self.var_circuit.rzlayer()
-            self.var_circuit.cnot_ring()
-            self.var_circuit.barrier()
+
+        if not 'HAE-bicyclic':      # 89.067%
+            for i in range(self.n_layer):
+                self.var_circuit.rzlayer()
+                self.var_circuit.rylayer()
+                self.var_circuit.rzlayer()
+                self.var_circuit.cnot_ring(reverse=(i % 2 == 1))
+            self.var_circuit.rzlayer()
+            self.var_circuit.rylayer()
+            self.var_circuit.rzlayer()
+
+        if not 'CCQC':              # 90.333% (depth=30), 87.867% (depth=10)
+            steps = [1, 3, 2] * 10
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                for q in range(self.n_qubit):
+                    c = (q + steps[i]) % self.n_qubit
+                    self.var_circuit.cu(c, q)
+            self.var_circuit.u3layer()
+
+        if not 'mera-cnot':         # 87.000%
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                offset = int(i % 2 == 1)
+                for q in range(offset, self.n_qubit - offset, 2):
+                    self.var_circuit.cnot(q, q + 1)
+            self.var_circuit.u3layer()
+
+        if not 'mera-updown-cnot':  # 89.733%
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                offset = int(i % 2 == 1)
+                for q in range(offset, self.n_qubit - offset, 2):
+                    if offset: self.var_circuit.cnot(q + 1, q)
+                    else:      self.var_circuit.cnot(q, q + 1)
+            self.var_circuit.u3layer()
+
+        if not 'mera-updown-crx':   # 88.067%
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                offset = int(i % 2 == 1)
+                for q in range(offset, self.n_qubit - offset, 2):
+                    if offset: self.var_circuit.crx(q + 1, q)
+                    else:      self.var_circuit.crx(q, q + 1)
+            self.var_circuit.u3layer()
+
+        if not 'mera-updown-cry':   # 88.600%/91.467%，有希望
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                offset = int(i % 2 == 1)
+                for q in range(offset, self.n_qubit - offset, 2):
+                    if offset: self.var_circuit.cry(q + 1, q)
+                    else:      self.var_circuit.cry(q, q + 1)
+            self.var_circuit.u3layer()
+
+        if 'mera-updown-cu':        # 88.333%/92.667%
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                offset = int(i % 2 == 1)
+                for q in range(offset, self.n_qubit - offset, 2):
+                    if offset: self.var_circuit.cu(q + 1, q)
+                    else:      self.var_circuit.cu(q, q + 1)
+            self.var_circuit.u3layer()
+
+        if not 'mera-updown CNOT control(z-y-z) + target(x-y-x)':   # 87.133%/91.133%
+            for i in range(self.n_layer):
+                offset = int(i % 2 == 1)
+                for q in range(offset, self.n_qubit - offset, 2):
+                    if offset:
+                        self.var_circuit.rx(q)
+                        self.var_circuit.ry(q)
+                        self.var_circuit.rx(q)
+                        self.var_circuit.rz(q + 1)
+                        self.var_circuit.ry(q + 1)
+                        self.var_circuit.rz(q + 1)
+                        self.var_circuit.cnot(q + 1, q)
+                    else:
+                        self.var_circuit.rz(q)
+                        self.var_circuit.ry(q)
+                        self.var_circuit.rz(q)
+                        self.var_circuit.rx(q + 1)
+                        self.var_circuit.ry(q + 1)
+                        self.var_circuit.rx(q + 1)
+                        self.var_circuit.cnot(q, q + 1)
+            self.var_circuit.u3layer()
+
+        if not 'swap-like':      # (参数量 4080 =_=||)
+            for i in range(self.n_layer):
+                steps = [1, 3, 2] * 10
+                # up
+                self.var_circuit.u3layer()
+                for q in range(0, self.n_qubit, 2):
+                    self.var_circuit.cu(q, (q+steps[i])%self.n_qubit)
+                # down
+                self.var_circuit.u3layer()
+                for q in range(0, self.n_qubit, 2):
+                    self.var_circuit.cu((q+steps[i])%self.n_qubit, q)
+                # up
+                self.var_circuit.u3layer()
+                for q in range(0, self.n_qubit, 2):
+                    self.var_circuit.cu(q, (q+steps[i])%self.n_qubit)
+            self.var_circuit.u3layer()
+
+        if not 'uccsd-like':        # 86.200%/87.533%
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                for q in range(self.n_qubit-1):
+                    self.var_circuit.cnot(q, q + 1)
+                    if q != 0: self.var_circuit.u3(q + 1)
+                self.var_circuit.u3(self.n_qubit - 1)
+                for q in reversed(range(self.n_qubit-1)):
+                    if q != 0: self.var_circuit.u3(q + 1)
+                    self.var_circuit.cnot(q, q + 1)
+            self.var_circuit.u3layer()
 
         # num of observable == num of classes
         self.var_circuit.observable(wires=0, basis='z')
@@ -36,6 +170,8 @@ class QuantumNeuralNetwork(nn.Module):
         self.var_circuit.observable(wires=0, basis='x')
         self.var_circuit.observable(wires=1, basis='x')
         self.var_circuit.observable(wires=0, basis='y')
+
+        print('gate count:', count_gates(self.var_circuit))
 
     def forward(self, z:Tensor, y:Tensor) -> Tuple[Tensor, Tensor]:
         self.var_circuit(state=z)   

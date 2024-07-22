@@ -79,7 +79,7 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
         inner_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}', leave=False, position=1)
         for x, y, z in inner_pbar:
             x, y, z = x.to(device), y.to(device), z.to(device)
-            z = qt_z(z)
+            #z = qt_z(z)
 
             optimizer.zero_grad()
             loss, output = model(z, y)

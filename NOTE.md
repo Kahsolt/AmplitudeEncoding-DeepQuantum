@@ -39,8 +39,8 @@
 
 ```
 test fid: 0.971
-test acc: 0.913
+test acc: 0.929
 test gates: 774.610
-runtime: 309.426
-客观得分: 309.353
+runtime: 297.869
+客观得分: 311.308
 ```
