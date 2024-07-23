@@ -73,6 +73,31 @@ def get_model(n_layer:int=5, nq:int=10) -> dq.QubitCircuit:
           vqc.add(g)
     vqc.rylayer()   # 最后一层需要初始化
 
+  if not 'mottonen-like zero-init ↓↑ u3-gate':   # n_layer=5, n_gate=280, fid=0.8324395418167114
+    for i in range(n_layer):
+      flag = i % 2 == 1
+      if flag == 0:
+        for q in range(1, nq):
+          # cond
+          lyr = dq.U3Layer(nq, wires=list(range(q)), requires_grad=True)
+          lyr.init_para([0] * (q*3))
+          vqc.add(lyr)
+          # mctrl-rot
+          g = dq.U3Gate(nqubit=nq, wires=q, controls=list(range(q)), condition=True, requires_grad=True)
+          g.init_para([0, 0, 0])
+          vqc.add(g)
+      else:
+        for q in reversed(range(1, nq)):
+          # cond
+          lyr = dq.U3Layer(nq, wires=list(range(q, nq)), requires_grad=True)
+          lyr.init_para([0] * (3*(nq - q + 1)))
+          vqc.add(lyr)
+          # mctrl-rot
+          g = dq.U3Gate(nqubit=nq, wires=q-1, controls=list(range(q, nq)), condition=True, requires_grad=True)
+          g.init_para([0, 0, 0])
+          vqc.add(g)
+    vqc.u3layer()   # 最后一层需要初始化
+
   if not 'mottonen-like zero-init shift↓':   # n_layer=5, n_gate=280, fid=0.8263607025146484
     for i in range(n_layer):
       for q in range(1, nq):
@@ -147,7 +172,7 @@ def run():
     # nlayer=4 gate=226 time= 73.86409831047058 fid=0.9128199219703674 (可能最优!!)
     # nlayer=3 gate=172 time= 56.92887687683106 fid=0.8413708209991455
     z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)
-    #z = z_func()
+    #z = reshape_norm_padding(x.unsqueeze(0), use_hijack=False)
 
     x, y, z = x.to(device), y.to(device), z.to(device)
     optimizer = optim.Adam(circ.parameters(), lr=0.02)
