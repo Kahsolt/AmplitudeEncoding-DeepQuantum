@@ -2,7 +2,9 @@
 # Author: Armit
 # Create Time: 2024/07/22 
 
-# 尝试纯粹训练线路
+# 尝试纯粹训练线路 (实验性小规模训练来筛选Ansatz)
+# normal: gate ~300, fid ~0.85
+# snake: gate ~280, fid ~0.94 (wtf?!)
 
 from time import time
 from model import *
@@ -15,7 +17,7 @@ device = 'cpu'
 def get_model(n_layer:int=5, nq:int=10) -> dq.QubitCircuit:
   vqc = dq.QubitCircuit(nq)
 
-  if not 'u3 bridge-cu':
+  if not 'u3 bridge-cu':  # n_layer=15, n_gate=228;  fid=0.7716873288154602
     for i in range(n_layer):
       vqc.u3layer()
       offset = int(i % 2 == 1)
@@ -138,11 +140,18 @@ def run():
 
   dataset = QMNISTDatasetIdea(label_list=[0], train=False, per_cls_size=10)
 
-  s = time()
   for idx, (x, y, z_func) in enumerate(dataset):
-    z = z_func()
+    # model=mottonen-like zero-init ↓↑
+    # nlayer=6 gate=334 time=110.43422794342041 fid=0.9528707265853882
+    # nlayer=5 gate=280 time= 92.87968921661377 fid=0.9477213025093079 (可能最优!!)
+    # nlayer=4 gate=226 time= 73.86409831047058 fid=0.9128199219703674 (可能最优!!)
+    # nlayer=3 gate=172 time= 56.92887687683106 fid=0.8413708209991455
+    z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)
+    #z = z_func()
+
     x, y, z = x.to(device), y.to(device), z.to(device)
     optimizer = optim.Adam(circ.parameters(), lr=0.02)
+    s = time()
     for i in range(N_ITER):
       state = circ().swapaxes(0, 1)     # [B=1, D=1024]
       loss = -get_fidelity(state, z)

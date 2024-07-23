@@ -3,7 +3,7 @@ import sys
 import random
 import pickle
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Generator
 
 import torch
 from torch import Tensor
@@ -66,6 +66,42 @@ def reshape_norm_padding(x:Tensor) -> Tensor:
     x = x.reshape(x.size(0), -1)
     x = F.normalize(x, p=2, dim=-1)
     x = F.pad(x, (0, 1024 - x.size(1)), mode='constant', value=0)
+    return x.to(torch.complex64)  # [B, D=1024]
+
+def snake_index_generator(N:int=28) -> Generator[Tuple[int, int], int, None]:
+    dir = 0     # 0: →, 1: ↓, 2: ←, 3: ↑
+    i, j = 0, -1
+    # the first stage only repeats once
+    steps_stage = N
+    steps_stage_repeat = 0
+    steps = steps_stage
+    # other stages will repeat twice
+    while steps_stage > 0:
+        if   dir == 0: j += 1
+        elif dir == 1: i += 1
+        elif dir == 2: j -= 1
+        elif dir == 3: i -= 1
+        yield i, j
+        steps -= 1
+        # next repeat or stage?
+        if steps == 0:
+            if steps_stage_repeat == 1:
+                steps_stage_repeat -= 1
+            else:
+                steps_stage_repeat = 1
+                steps_stage -= 1
+            steps = steps_stage
+            dir = (dir + 1) % 4
+
+def snake_reshape_norm_padding(x:Tensor, rev:bool=False) -> Tensor:
+    assert len(x.shape) == 4
+    pixels = []
+    for i, j in snake_index_generator():
+        pixels.append(x[:, :, i, j])
+    x = torch.cat(pixels, -1)
+    if rev: x = x.flip(-1)  # re-roder center to border
+    x = F.pad(x, (0, 1024 - x.size(1)), mode='constant', value=x.min())
+    x = F.normalize(x, p=2, dim=-1)
     return x.to(torch.complex64)  # [B, D=1024]
 
 

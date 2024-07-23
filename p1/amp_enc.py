@@ -21,7 +21,7 @@ def sign(x:int):
   if x  > 0: return  1
   if x  < 0: return -1
 
-mean = lambda x: sum(x) / len(x)
+mean = lambda x: sum(x) / len(x) if len(x) else -1
 
 @dataclass
 class Node:
@@ -200,7 +200,12 @@ def amplitude_encode(amp:List[float], encode:bool=False, eps:float=1e-3, gamma:f
     qc.add(g, encode=encode)
   elif name == 'H*':
     for q in args:
-      qc.h(q)
+      if encode:
+        qc.h(q)
+      else:
+        g = dq.gate.Ry(nqubit=at.nq, wires=q, requires_grad=True)
+        g.init_para([np.pi/2])
+        qc.add(g, encode=encode)
   else: raise TypeError(name, args)
 
   for q in range(1, at.nq):
@@ -218,14 +223,24 @@ def amplitude_encode(amp:List[float], encode:bool=False, eps:float=1e-3, gamma:f
       if name == 'X':
         qc.x(q, controls=mctrl, condition=True)
       elif name == 'H':
-        qc.h(q, controls=mctrl, condition=True)
+        if encode:
+          qc.h(q, controls=mctrl, condition=True)
+        else:
+          g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, condition=True, requires_grad=True)
+          g.init_para([np.pi/2])
+          qc.add(g, encode=encode)
       elif name == 'RY':
         g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, condition=True, requires_grad=True)
         g.init_para([args])
         qc.add(g, encode=encode)
       elif name == 'H*':
         for qq in args:
-          qc.h(qq, controls=mctrl, condition=True)
+          if encode:
+            qc.h(qq, controls=mctrl, condition=True)
+          else:
+            g = dq.gate.Ry(nqubit=at.nq, wires=qq, controls=mctrl, condition=True, requires_grad=True)
+            g.init_para([np.pi/2])
+            qc.add(g, encode=encode)
       else:
         raise TypeError(name, args)
       # uncond
