@@ -26,7 +26,7 @@ if 'fix seed':
 
 BASE_PATH = Path(__file__).parent
 
-if sys.platform == 'win32':
+if os.getenv('MY_LABORATORY') or sys.platform == 'win32':
     DATA_PATH = BASE_PATH.parent / 'data'
 else:
     DATA_PATH = '/data'
@@ -231,7 +231,7 @@ class MNISTDataset(Dataset):
 # TODO: 构建振幅编码线路
 class QMNISTDataset(Dataset):
 
-    def __init__(self, label_list:list = [0, 1], train:bool = True, size:int = 100000000, per_cls_size:int = 100000000):
+    def __init__(self, label_list:list = [0, 1], train:bool = True, size:int = 100000000, per_cls_size:int = 100000000, skip_generate_data:bool = False):
         """
         初始化 QMNISTDataset 类。
         Args:
@@ -276,7 +276,7 @@ class QMNISTDataset(Dataset):
             print(f'>> shrink per-label sample count to {per_cls_size}')
 
         self.sub_dataset = sub_dataset[:size]
-        self.data_list = self.generate_data()
+        self.data_list = [] if skip_generate_data else self.generate_data()
 
     def __len__(self):
         return len(self.data_list)
@@ -343,8 +343,6 @@ class QMNISTDataset(Dataset):
         return data_list
 
     def generate_data_VQC(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
-        raise RuntimeError('这个封装太不方便了，请使用我们写的 train_bulk.py 脚本')
-
         from train_single import get_model
 
         data_list = []
@@ -364,8 +362,7 @@ class QMNISTDataset(Dataset):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                if i % 100 == 0:
-                    print('fid:', -loss.item())
+                #if i % 100 == 0: print('fid:', -loss.item())
             state = circ().swapaxes(0, 1)
             print(f'>> Fidelity:', get_fidelity(state, target).item())
 
