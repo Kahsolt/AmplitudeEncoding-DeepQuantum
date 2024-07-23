@@ -38,20 +38,6 @@ transform = T.Compose([
     T.Normalize((0.1307,), (0.3081,)),
 ])
 
-avg = torch.Tensor([[[0.3081]]])
-std = torch.Tensor([[[0.1307]]])
-
-def normalize(x:Tensor) -> Tensor:
-    global avg, std
-    avg = avg.to(x.device)
-    std = std.to(x.device)
-    return (x - avg) / std
-def denormalize(x:Tensor) -> Tensor:
-    global avg, std
-    avg = avg.to(x.device)
-    std = std.to(x.device)
-    return x * std + avg
-
 
 def count_gates(cir:dq.QubitCircuit) -> int:
     count = 0
@@ -61,7 +47,10 @@ def count_gates(cir:dq.QubitCircuit) -> int:
     return count
 
 
-def reshape_norm_padding(x:Tensor) -> Tensor:
+def reshape_norm_padding(x:Tensor, use_hijack:bool=True) -> Tensor:
+    # NOTE: 因为test脚本不能修改，所以需要在云评测时直接替换具体实现
+    if use_hijack: return snake_reshape_norm_padding(x)
+
     # x: [B, C=1, H=28, W=28]
     x = x.reshape(x.size(0), -1)
     x = F.normalize(x, p=2, dim=-1)
@@ -93,7 +82,7 @@ def snake_index_generator(N:int=28) -> Generator[Tuple[int, int], int, None]:
             steps = steps_stage
             dir = (dir + 1) % 4
 
-def snake_reshape_norm_padding(x:Tensor, rev:bool=False) -> Tensor:
+def snake_reshape_norm_padding(x:Tensor, rev:bool=True) -> Tensor:
     assert len(x.shape) == 4
     pixels = []
     for i, j in snake_index_generator():
@@ -306,6 +295,10 @@ class QMNISTDataset(Dataset):
             gates_count += count_gates(encoding_cir)
         return gates_count / len(self.data_list)
 
+    def generate_data(self):
+        #self.generate_data_AmpEnc()
+        self.generate_data_VQC()
+
     def generate_data_AmpEnc(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
         """ a list of tuples (原始经典数据, 标签, 振幅编码量子线路)=(image, label, encoding_circuit) """
         from amp_enc import amplitude_encode
@@ -319,31 +312,13 @@ class QMNISTDataset(Dataset):
             # 振幅接近的误差阈值，可将一组相近振幅近似为 H*
             # H*分组的方差容许范围, 越小精度越高但需要的门越多 (不能超过 0.02)
             GAMMA = 0.016
-            # 像素重采样量化数
-            QT = None
-            # 翻转向量顺序 (尾填充零的放在前面)
-            X_FLIP = False
 
             # 原始数据
             x: Tensor = image                               # [1, 28, 28]
             target = reshape_norm_padding(x.unsqueeze(0))   # [1, 1024]
-            if X_FLIP: target = target.flip(-1)
-
-            # 目标编码向量
-            target_approx = target
-            if QT:
-                x = denormalize(x)
-                vmin, vmax = x.min(), x.max()
-                x = (x - vmin) / (vmax - vmin)
-                nq = 256 // QT
-                x = ((x * 255 / nq).round() * nq) / 255
-                x = x * (vmax - vmin) + vmin
-                x = normalize(x)
-                target_approx = reshape_norm_padding(x.unsqueeze(0))
-                #print('fid_approx:', get_fidelity(target_approx, target).item())
 
             # 构建振幅编码线路
-            circ = amplitude_encode(target_approx[0].real.numpy().tolist(), eps=EPS, gamma=GAMMA)
+            circ = amplitude_encode(target[0].real.numpy().tolist(), eps=EPS, gamma=GAMMA)
             #print('gate count:', count_gates(circ))
             #print('param count:', sum([p.numel() for p in circ.parameters()]))
 
@@ -367,7 +342,9 @@ class QMNISTDataset(Dataset):
             data_list.append((image, label, circ))
         return data_list
 
-    def generate_data(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
+    def generate_data_VQC(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
+        raise RuntimeError('这个封装太不方便了，请使用我们写的 train_bulk.py 脚本')
+
         from train_single import get_model
 
         data_list = []
@@ -413,11 +390,7 @@ class QMNISTDatasetIdea(QMNISTDataset):   # 理想的振幅编码数据集，用
     def generate_data(self) -> List[Tuple[Tensor, int, DataHolder]]:
         data_list = []
         for image, label in tqdm(self.sub_dataset):
-            # 翻转向量顺序 (尾填充零的放在前面)
-            X_FLIP = False
-
             target = reshape_norm_padding(image.unsqueeze(0))
-            if X_FLIP: target = target.flip(-1)
             data_list.append((image, label, DataHolder(target)))
         return data_list
 

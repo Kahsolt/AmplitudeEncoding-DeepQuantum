@@ -9,7 +9,7 @@ from typing import List, Tuple
 
 import numpy as np
 import deepquantum as dq
-from utils import count_gates, QMNISTDatasetIdea, normalize, denormalize, reshape_norm_padding
+from utils import count_gates, QMNISTDatasetIdea
 
 
 def to_amp(coeffs:List[float]) -> List[float]:
@@ -284,17 +284,10 @@ def test_amplitude_encode(amp:List[float], eps:float=1e-3, gamma:float=1e-2) -> 
   if fidelity < 0.75: breakpoint()
   return qc
 
-def test_amplitude_encode_mnist(qt:int=None, eps:float=1e-3, gamma:float=1e-2):
+def test_amplitude_encode_mnist(eps:float=1e-3, gamma:float=1e-2):
   dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False, size=5, per_cls_size=1)
-  for x, y, z in dataset:
-    if qt:
-      x = denormalize(x)
-      x = (x - x.min()) / (x.max() - x.min())
-      x = ((x * 255 / qt).round() * qt) / 255
-      x = normalize(x)
-      state = reshape_norm_padding(x.unsqueeze(0)).real.flatten().numpy().tolist()
-    else:
-      state = z().detach().real.flatten().numpy()
+  for x, y, get_z in dataset:
+    state = get_z().detach().real.flatten().numpy()
     test_amplitude_encode(state, eps=eps, gamma=gamma)
 
 
@@ -321,15 +314,3 @@ if __name__ == '__main__':
       test_amplitude_encode(np.random.uniform(low=-1, high=1, size=2**4))
     print('test_amplitude_encode_rand(10)')
     test_amplitude_encode(np.random.uniform(low=-1, high=1, size=2**10))
-
-  print()
-
-  if not 'test dataset':
-    print('test_amplitude_encode_mnist()')
-    test_amplitude_encode_mnist(qt=None)
-    test_amplitude_encode_mnist(qt=4)
-    test_amplitude_encode_mnist(qt=8)
-    test_amplitude_encode_mnist(qt=16)
-    test_amplitude_encode_mnist(qt=32)
-    test_amplitude_encode_mnist(qt=64)
-    test_amplitude_encode_mnist(qt=128)
