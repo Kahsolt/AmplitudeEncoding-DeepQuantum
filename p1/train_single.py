@@ -7,7 +7,6 @@
 # snake: gate ~280, fid ~0.94 (wtf?!)
 
 from time import time
-from model import *
 from utils import *
 
 N_ITER = 1000

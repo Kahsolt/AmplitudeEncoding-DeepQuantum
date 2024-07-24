@@ -9,6 +9,7 @@ from torch import optim
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from model import QuantumNeuralNetwork
 from utils import QMNISTDataset, QMNISTDatasetIdea, cir_collate_fn
@@ -71,7 +72,7 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
             #total_norm = clip_grad_norm_(model.parameters(), float('inf'))  # Calculate gradient norms
             total_norm = 0
             optimizer.step()
-            train_loss += loss.item()
+            train_loss += loss.item() * len(x)
             train_acc += (output.argmax(-1) == y).sum().item()
             inner_pbar.set_description(f'Batch Loss: {loss.item():.4f} | Grad Norm: {total_norm:.2f}')
             pbar.update()
@@ -79,7 +80,7 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
         train_acc /= len(train_loader.dataset)
         history['train_loss'].append(train_loss)
         history['train_acc'].append(train_acc)
-        print(f'Epoch {epoch+1}/{num_epochs} - Train loss: {train_loss:.3f}, Train acc: {train_acc:.3%}')
+        print(f'Epoch {epoch+1}/{num_epochs} - Train loss: {train_loss:.7f}, Train acc: {train_acc:.3%}')
         with open(history_path, 'w', encoding='utf-8') as fh:
             json.dump(history, fh, indent=2, ensure_ascii=False)
 
@@ -91,20 +92,20 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
             for x, y, z in valid_loader:
                 x, y, z = x.to(device), y.to(device), z.to(device)
                 loss, output = model(z, y)
-                valid_loss += loss.item()
+                valid_loss += loss.item() * len(x)
                 valid_acc += (output.argmax(-1) == y).sum().item()
         valid_loss /= len(valid_loader.dataset)
         valid_acc /= len(valid_loader.dataset)
         history['valid_loss'].append(valid_loss)
         history['valid_acc'].append(valid_acc)
-        print(f'Epoch {epoch+1}/{num_epochs} - Valid loss: {valid_loss:.3f}, Valid acc: {valid_acc:.3%}')
+        print(f'Epoch {epoch+1}/{num_epochs} - Valid loss: {valid_loss:.7f}, Valid acc: {valid_acc:.3%}')
         with open(history_path, 'w', encoding='utf-8') as fh:
             json.dump(history, fh, indent=2, ensure_ascii=False)
 
         ''' Ckpt '''
-        if valid_loss < best_valid_loss: 
+        if valid_loss < best_valid_loss:
+            print(f'>> New best found {best_valid_loss:.7f} => {valid_loss:.7f}')
             best_valid_loss = valid_loss
-            print(f'>> New best found, save to {save_path}')
             torch.save(model.state_dict(), save_path)
             epochs_no_improve = 0   # Reset the counter since we have improvement
         else:
@@ -116,18 +117,33 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
 
     pbar.close()
 
+    plt.clf()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(history['train_acc'], 'orange', label='train acc')
+    ax.plot(history['valid_acc'], 'red',    label='valid acc')
+    ax.set_ylabel('accuracy')
+    ax2 = ax.twinx()
+    ax2.plot(history['train_loss'], 'dodgerblue', label='train loss')
+    ax2.plot(history['valid_loss'], 'blue',       label='valid loss')
+    ax2.set_ylabel('loss')
+    fig.legend(loc=7, bbox_to_anchor=(1,1), bbox_transform=ax.transAxes)    # 7 = center right
+    plt.tight_layout()
+    plt.savefig(f'{OUTPUT_DIR}/loss_acc.png', dpi=300)
+
 
 if __name__ == '__main__':
     # Settings 
     DEVICE = "cuda:0"
     BATCH_SIZE = 64
-    NUM_EPOCHS = 30
-    PATIENCE = 3      # if PATIENCE与NUM_EPOCHS相等，则不会触发early stopping
+    NUM_EPOCHS = 100
+    PATIENCE = 100      # if PATIENCE与NUM_EPOCHS相等，则不会触发early stopping
     OUTPUT_DIR = 'output'
 
     # Data
     #dataset = QMNISTDataset(label_list=[0,1,2,3,4], train=True, per_cls_size=1000)
     dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=True, per_cls_size=1000)
+    #dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False)
     train_size = int(0.7 * len(dataset))
     valid_size = len(dataset) - train_size
     train_dataset, valid_dataset = random_split(dataset, [train_size, valid_size])
