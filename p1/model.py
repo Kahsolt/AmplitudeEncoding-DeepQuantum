@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
@@ -178,6 +179,7 @@ class QuantumNeuralNetwork(nn.Module):
         output = self.var_circuit.expectation()          
         return self.loss_fn(output, y), output
 
+    @torch.inference_mode()
     def inference(self, z:Tensor) -> Tensor:
         """
         推理接口。

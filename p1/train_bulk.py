@@ -31,32 +31,18 @@ class QMNISTDatasetDummy(QMNISTDatasetIdea):   # 无预处理操作的数据集
     return data_list
 
 
-def get_model(n_layer:int=5, nq:int=10) -> dq.QubitCircuit:
-  ''' mottonen-like zero-init ↓↑ '''
+def get_model(n_layer:int=15, nq:int=10) -> dq.QubitCircuit:
+  ''' swap-like zero init '''
   vqc = dq.QubitCircuit(nq)
+  vqc.x(0)
   for i in range(n_layer):
-    flag = i % 2 == 1
-    if flag == 0:
-      for q in range(1, nq):
-        # cond
-        lyr = dq.RyLayer(nq, wires=list(range(q)), requires_grad=True)
-        lyr.init_para([0] * q)
-        vqc.add(lyr)
-        # mctrl-rot
-        g = dq.Ry(nqubit=nq, wires=q, controls=list(range(q)), condition=True, requires_grad=True)
-        g.init_para([0])
-        vqc.add(g)
-    else:
-      for q in reversed(range(1, nq)):
-        # cond
-        lyr = dq.RyLayer(nq, wires=list(range(q, nq)), requires_grad=True)
-        lyr.init_para([0] * (nq - q + 1))
-        vqc.add(lyr)
-        # mctrl-rot
-        g = dq.Ry(nqubit=nq, wires=q-1, controls=list(range(q, nq)), condition=True, requires_grad=True)
-        g.init_para([0])
-        vqc.add(g)
-  vqc.rylayer()   # 最后一层需要初始化
+    for q in range(nq):
+      g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+      g.init_para([0])
+      vqc.add(g)
+      g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+      g.init_para([0])
+      vqc.add(g)
   return vqc
 
 

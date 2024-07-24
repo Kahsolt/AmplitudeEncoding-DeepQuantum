@@ -47,7 +47,14 @@ def get_model(n_layer:int=5, nq:int=10) -> dq.QubitCircuit:
         vqc.add(g)
     vqc.rylayer()   # 最后一层需要初始化
 
-  if 'mottonen-like zero-init ↓↑':   # n_layer=5, n_gate=280; fid=0.8616576194763184
+  # [normal_reshape]
+  # n_layer=5, n_gate=280; fid=0.8616576194763184
+  # [snake_reshape]
+  # nlayer=6 gate=334 time=110.43422794342041 fid=0.9528707265853882
+  # nlayer=5 gate=280 time= 92.87968921661377 fid=0.9477213025093079 (可能最优!!)
+  # nlayer=4 gate=226 time= 73.86409831047058 fid=0.9128199219703674 (可能最优!!)
+  # nlayer=3 gate=172 time= 56.92887687683106 fid=0.8413708209991455
+  if not 'mottonen-like zero-init ↓↑':
     for i in range(n_layer):
       flag = i % 2 == 1
       if flag == 0:
@@ -154,22 +161,76 @@ def get_model(n_layer:int=5, nq:int=10) -> dq.QubitCircuit:
             vqc.cnot(k+1, k)
     vqc.rylayer()   # 最后一层需要初始化
 
+  if not 'swap-like':    # n_layer=15, n_gate=271, fid=0.9302663803100586
+    vqc.x(0)
+    for i in range(n_layer):
+      for q in range(nq):
+        vqc.cry(q, q+1)
+        vqc.cry(q+1, q)
+
+  # [normal_reshape]
+  # n_layer=15, n_gate=271, fid=0.8838197588920593
+  # n_layer=12, n_gate=241, fid=0.8564713001251221
+  # [snake_reshape]
+  # n_layer=15, n_gate=271, fid=0.9552421569824219
+  # n_layer=12, n_gate=241, fid=0.9351020455360413
+  if 'swap-like zero init':
+    vqc.x(0)
+    for i in range(n_layer):
+      for q in range(nq):
+        g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+
+  if not 'swap-like cyclic zero init':  # n_layer=15, n_gate=301, fid=0.9552421569824219
+    vqc.x(0)
+    for i in range(n_layer):
+      for q in range(nq):
+        g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+
+  if not 'swap-like cyclic zero init \/':   # n_layer=15, n_gate=273, fid=0.9490880966186523
+    vqc.x(0)
+    for i in range(n_layer):
+      is_even = i % 2 == 0
+      if is_even:
+        for q in range(nq):   # outer, 10 qubits
+          g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+          g.init_para([0])
+          vqc.add(g)
+          g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+          g.init_para([0])
+          vqc.add(g)
+      else:                   # inner, 8 qubits
+        nnqq = nq - 2
+        offset = 1
+        for q in range(1, nq-1):
+          g = dq.Ry(nqubit=nq, wires=(q-offset+1)%nnqq+offset, controls=q, condition=True, requires_grad=True)
+          g.init_para([0])
+          vqc.add(g)
+          g = dq.Ry(nqubit=nq, wires=q, controls=(q-offset+1)%nnqq+offset, condition=True, requires_grad=True)
+          g.init_para([0])
+          vqc.add(g)
+
   return vqc
 
 
 def run():
-  circ = get_model(n_layer=5).to(device)
+  circ = get_model(n_layer=12).to(device)
   print('gate count:', count_gates(circ))
   print('param count:', sum([p.numel() for p in circ.parameters()]))
 
   dataset = QMNISTDatasetIdea(label_list=[0], train=False, per_cls_size=10)
 
   for idx, (x, y, z_func) in enumerate(dataset):
-    # model=mottonen-like zero-init ↓↑
-    # nlayer=6 gate=334 time=110.43422794342041 fid=0.9528707265853882
-    # nlayer=5 gate=280 time= 92.87968921661377 fid=0.9477213025093079 (可能最优!!)
-    # nlayer=4 gate=226 time= 73.86409831047058 fid=0.9128199219703674 (可能最优!!)
-    # nlayer=3 gate=172 time= 56.92887687683106 fid=0.8413708209991455
+
     z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)
     #z = reshape_norm_padding(x.unsqueeze(0), use_hijack=False)
 
