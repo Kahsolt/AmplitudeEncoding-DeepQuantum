@@ -7,7 +7,7 @@
 # 每个样本训练时间约 1min30s，期间没有log信息输出，每个样本训练完之后会有一条log
 
 import os
-os.environ['MY_LABORATORY'] = 1
+os.environ['MY_LABORATORY'] = '1'
 
 import logging
 from argparse import ArgumentParser
@@ -78,6 +78,7 @@ def run(args):
 
   dataset = QMNISTDatasetDummy(label_list=[0,1,2,3,4], train=False)
   assert len(dataset) == N_SAMPLES
+  if args.start == args.stop: return
 
   fid_list = []
   save_data = []
@@ -116,7 +117,7 @@ if __name__ == '__main__':
   parser.add_argument('-B', '--stop',  required=True, type=int, help='sample index range stop (not including)')
   args = parser.parse_args()
 
-  assert 0 <= args.start < args.stop <= N_SAMPLES
+  assert 0 <= args.start <= args.stop <= N_SAMPLES
   print(f'>> training samples in range [{args.start}, {args.stop}), collect {args.stop - args.start} samples')
 
   run(args)

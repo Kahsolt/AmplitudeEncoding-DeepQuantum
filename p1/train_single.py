@@ -7,7 +7,7 @@
 # snake: gate ~280, fid ~0.94 (wtf?!)
 
 import os
-os.environ['MY_LABORATORY'] = 1
+os.environ['MY_LABORATORY'] = '1'
 
 from time import time
 from utils import *

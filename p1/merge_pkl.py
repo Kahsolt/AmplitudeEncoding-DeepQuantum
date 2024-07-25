@@ -5,7 +5,7 @@
 # 合并 train_bulk.py 产生的多个 test_dataset_A=a_B=b.pkl 为单个 test_dataset.pkl
 
 import os
-os.environ['MY_LABORATORY'] = 1
+os.environ['MY_LABORATORY'] = '1'
 
 from re import compile as Regex
 import pickle as pkl
@@ -59,6 +59,11 @@ for fn in tqdm(fns):
     cnt += 1
 
 print(f'>> total need: {N_SAMPLES}, found processed: {cnt}')
+if N_SAMPLES != cnt:
+  print('[Missing samples]')
+  for i, sample in  enumerate(data_list):
+    if sample is None:
+      print(f'  {i}')
 fids_valid = [e for e in fids if e is not None]
 print(f'mean(fid): {mean(fids_valid)}')
 
