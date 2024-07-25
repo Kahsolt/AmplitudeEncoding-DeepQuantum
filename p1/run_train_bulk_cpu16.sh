@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 # 16 核机器上跑这个
+# Intel Xeon Gold 6226R@2.9Ghz
+# https://versus.com/en/intel-xeon-gold-6226r-vs-intel-xeon-silver-4215r
 
 export MY_LABORATORY=1
 

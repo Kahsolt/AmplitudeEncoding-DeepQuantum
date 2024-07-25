@@ -5,7 +5,8 @@
 # 合并 train_bulk.py 产生的多个 test_dataset_A=a_B=b.pkl 为单个 test_dataset.pkl
 
 import os
-from pathlib import Path
+os.environ['MY_LABORATORY'] = 1
+
 from re import compile as Regex
 import pickle as pkl
 from time import time
@@ -16,7 +17,7 @@ from typing import List, Tuple
 from train_bulk import N_SAMPLES, mean
 from utils import QMNISTDataset
 
-OUTPUT_DIR = '.\\output'
+OUTPUT_DIR = './output'
 assert os.path.exists(OUTPUT_DIR)
 
 R_FILENAME = Regex('A=(\d+)_B=(\d+)')
@@ -46,7 +47,8 @@ for fn in tqdm(fns):
   print(f'>> processing {fn}...')
   with open(fn, 'rb') as fh:
     samples = pkl.load(fh)
-  with open(Path(fn).with_suffix('.log'), 'r', encoding='utf-8') as fh:
+
+  with open(fn.replace('.pkl', '.log'), 'r', encoding='utf-8') as fh:
     logs = fh.read().strip().split('\n')
     fids = logs_to_fids(logs)
 

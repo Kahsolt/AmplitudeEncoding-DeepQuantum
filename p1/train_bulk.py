@@ -6,6 +6,9 @@
 # NOTE: 测试集一共有 5139 个样本，注意 --start/--stop 指定的是左闭右开区间 [a,b)
 # 每个样本训练时间约 1min30s，期间没有log信息输出，每个样本训练完之后会有一条log
 
+import os
+os.environ['MY_LABORATORY'] = 1
+
 import logging
 from argparse import ArgumentParser
 from train_single import *

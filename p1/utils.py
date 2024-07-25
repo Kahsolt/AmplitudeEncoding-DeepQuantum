@@ -2,7 +2,6 @@ import os
 import sys
 import random
 import pickle
-from pathlib import Path
 from typing import List, Tuple, Dict, Generator
 
 import torch
@@ -24,10 +23,8 @@ if 'fix seed':
     torch.manual_seed(42)
     torch.cuda.manual_seed_all(42)
 
-BASE_PATH = Path(__file__).parent
-
 if os.getenv('MY_LABORATORY') or sys.platform == 'win32':
-    DATA_PATH = BASE_PATH.parent / 'data'
+    DATA_PATH = '../data'
 else:
     DATA_PATH = '/data'
 
