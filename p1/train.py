@@ -103,6 +103,8 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
             json.dump(history, fh, indent=2, ensure_ascii=False)
 
         ''' Ckpt '''
+        torch.save(model.state_dict(), os.path.join(output_dir, f"model_epoch={epoch}.pt"))
+
         if valid_loss < best_valid_loss:
             print(f'>> New best found {best_valid_loss:.7f} => {valid_loss:.7f}')
             best_valid_loss = valid_loss
@@ -136,8 +138,8 @@ if __name__ == '__main__':
     # Settings 
     DEVICE = "cuda:0"
     BATCH_SIZE = 64
-    NUM_EPOCHS = 100
-    PATIENCE = 100      # if PATIENCE与NUM_EPOCHS相等，则不会触发early stopping
+    NUM_EPOCHS = 35
+    PATIENCE = NUM_EPOCHS   # if PATIENCE与NUM_EPOCHS相等，则不会触发early stopping
     OUTPUT_DIR = 'output'
 
     # Data

@@ -46,7 +46,7 @@ def test_model(model:QuantumNeuralNetwork, test_loader:DataLoader, device:torch.
     y_pred = torch.cat(y_pred, dim=0)
     y_true = torch.cat(y_true, dim=0)
 
-    y_pred = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+    y_pred = torch.argmax(y_pred, dim=1)
     acc = get_acc(y_pred, y_true)
     fid = get_fidelity(state_pred, state_true)
 

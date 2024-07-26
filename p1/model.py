@@ -105,7 +105,7 @@ class QuantumNeuralNetwork(nn.Module):
                     else:      self.var_circuit.cry(q, q + 1)
             self.var_circuit.u3layer()
 
-        if 'mera-updown-cu':        # 88.333%/92.667%
+        if 'mera-updown-cu':        # 88.333%/92.667%; gcnt=445, pcnt=1335
             for i in range(self.n_layer):
                 self.var_circuit.u3layer()
                 offset = int(i % 2 == 1)
@@ -136,7 +136,7 @@ class QuantumNeuralNetwork(nn.Module):
                         self.var_circuit.cnot(q, q + 1)
             self.var_circuit.u3layer()
 
-        if not 'swap-like':      # (参数量 4080 =_=||)
+        if not 'swap-like':         # pcnt=4080 =_=||
             for i in range(self.n_layer):
                 steps = [1, 3, 2] * 10
                 # up

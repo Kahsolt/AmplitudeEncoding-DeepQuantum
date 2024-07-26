@@ -95,9 +95,9 @@ def get_fidelity(state_pred:Tensor, state_true:Tensor) -> Tensor:
     # [B, D=1024]
     #assert len(state_pred.shape) == len(state_true.shape) == 2
     #assert state_pred.shape[-1] == 1024
-    state_pred = state_pred.view(-1, 1024)
-    state_true = state_true.view(-1, 1024)
-    fidelity = torch.abs(torch.matmul(state_true.conj(), state_pred.T)) ** 2
+    state_pred = state_pred.view(-1, 1024).real
+    state_true = state_true.view(-1, 1024).real
+    fidelity = torch.matmul(state_true, state_pred.T) ** 2
     return fidelity.diag().mean()
 
 
