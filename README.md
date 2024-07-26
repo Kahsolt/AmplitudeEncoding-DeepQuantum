@@ -32,6 +32,7 @@ Team Name: 我来晚了
     - https://docs.pennylane.ai/en/stable/code/api/pennylane.MottonenStatePreparation.html
   - QGAN
     - https://arxiv.org/abs/1904.00043
+- QAM: https://nvlabs.github.io/sionna/examples/Hello_World.html
 
 ----
 by Armit

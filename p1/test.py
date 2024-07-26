@@ -69,12 +69,16 @@ if __name__ == '__main__':
     BATCH_SIZE = 514    # test samples: 5139
 
     # 数据集
+    t0 = time.time()
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
         test_dataset = pickle.load(file)
-    print('>> load pickle done')
+    t1 = time.time()
+    print(f'>> load pickle done ({t1 - t0:.3f}s)')
+    t0 = time.time()
     if not validate_test_dataset(test_dataset):
         raise RuntimeError('>> Error: test_dataset is not valid')
-    print('>> check dataset done')
+    t1 = time.time()
+    print(f'>> check dataset done ({t1 - t0:.3f}s)')
 
     # 模型
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)

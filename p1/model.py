@@ -165,6 +165,13 @@ class QuantumNeuralNetwork(nn.Module):
                     self.var_circuit.cnot(q, q + 1)
             self.var_circuit.u3layer()
 
+        if not 'swap-like':          # (snake) 89.400%/90.000%; n_gate=540, n_param=541
+            self.var_circuit.x(0)
+            for i in range(self.n_layer):
+                for q in range(self.n_qubit-1):
+                    self.var_circuit.cry(q, (q+1)%self.n_qubit)
+                    self.var_circuit.cry((q+1)%self.n_qubit, q)
+
         # num of observable == num of classes
         self.var_circuit.observable(wires=0, basis='z')
         self.var_circuit.observable(wires=1, basis='z')
@@ -172,7 +179,7 @@ class QuantumNeuralNetwork(nn.Module):
         self.var_circuit.observable(wires=1, basis='x')
         self.var_circuit.observable(wires=0, basis='y')
 
-        print('gate count:', count_gates(self.var_circuit))
+        print('classifier gate count:', count_gates(self.var_circuit))
 
     def forward(self, z:Tensor, y:Tensor) -> Tuple[Tensor, Tensor]:
         self.var_circuit(state=z)   

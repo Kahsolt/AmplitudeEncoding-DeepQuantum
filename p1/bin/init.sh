@@ -9,5 +9,5 @@ pip install deepquantum
 
 # just download the dataset :)
 if [ ! -d ../data ]; then
-  python train_bulk.py -A 0 -B 0
+  python amp_enc_vqc.py -A 0 -B 0
 fi

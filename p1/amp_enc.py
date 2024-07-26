@@ -2,6 +2,8 @@
 # Author: Armit
 # Create Time: 2024/07/22 
 
+# AmpTree方法: 精确编码 + 近似剪枝
+
 import math
 from dataclasses import dataclass
 from functools import lru_cache
@@ -9,7 +11,7 @@ from typing import List, Tuple
 
 import numpy as np
 import deepquantum as dq
-from utils import count_gates, QMNISTDatasetIdea
+from utils import count_gates, QMNISTDatasetIdea, mean
 
 
 def to_amp(coeffs:List[float]) -> List[float]:
@@ -21,7 +23,6 @@ def sign(x:int):
   if x  > 0: return  1
   if x  < 0: return -1
 
-mean = lambda x: sum(x) / len(x) if len(x) else -1
 
 @dataclass
 class Node:

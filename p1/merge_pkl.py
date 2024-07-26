@@ -2,7 +2,7 @@
 # Author: Armit
 # Create Time: 2024/07/24 
 
-# 合并 train_bulk.py 产生的多个 test_dataset_A=a_B=b.pkl 为单个 test_dataset.pkl
+# 合并 amp_enc_vqc.py 产生的多个 test_dataset_A=a_B=b.pkl 为单个 test_dataset.pkl
 
 import os
 os.environ['MY_LABORATORY'] = '1'
@@ -14,8 +14,8 @@ from glob import glob
 from tqdm import tqdm
 from typing import List, Tuple
 
-from train_bulk import N_SAMPLES, mean
-from utils import QMNISTDataset
+from amp_enc_vqc import N_SAMPLES
+from utils import QMNISTDataset, mean
 
 OUTPUT_DIR = './output'
 assert os.path.exists(OUTPUT_DIR)

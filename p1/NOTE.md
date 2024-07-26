@@ -23,7 +23,7 @@
 | 0.001 | 0.016 | 2 | 0.956 | 797.65 | no training (20 samples stats) |
 | 0.001 | 0.018 | 2 | 0.939 | 766.85 | no training (20 samples stats) |
 | 0.001 | 0.020 | 2 | 0.893 | 719.75 | no training (20 samples stats) |
-| 0.001 | 0.022 | 2 | 0.866 | 694.2 | no training (20 samples stats) |
+| 0.001 | 0.022 | 2 | 0.866 |  694.2 | no training (20 samples stats) |
 
 - 构建 Ansantz 进行分类
 
@@ -32,9 +32,9 @@
 
 - 393.092 (假的)
 - 357.899
+- 352.020 (我)
 - 351.025 (铅笔芯奇)
 - 347.623
-- 311.589 (我)
 
 我的最好成绩
 
@@ -53,7 +53,7 @@ Accuracy: 0.929
 运行时间: 287.7688663005829
 客观得分: 311.5888760951294 最高分数: 400
 
-[2nd solution] (VQC + snake + train(step=1000) ckpt-14)
+[2nd solution] (VQC + snake + train(step=1000) n_layer=15 (cyclic) ckpt-14)
 ⚪ local
 test fid: 0.930
 test acc: 0.890
@@ -66,6 +66,20 @@ Accuracy: 0.890
 振幅编码线路门的个数: 301.0
 运行时间: 210.35138130187988
 客观得分: 349.1681521839566 最高分数: 400
+
+[3rd solution] (VQC + snake + train(step=1000) n_layer=14 ckpt-14)
+⚪ local
+test fid: 0.916
+test acc: 0.889
+test gates: 253.000
+runtime: 140.611
+客观得分: 352.919
+⚪ submit
+Fidelity: 0.916
+Accuracy: 0.889
+振幅编码线路门的个数: 253.0
+运行时间: 172.98028898239136
+客观得分: 352.02026591565874 最高分数: 400
 ```
 
 得分模板

@@ -35,6 +35,8 @@ transform = T.Compose([
     T.Normalize((0.1307,), (0.3081,)),
 ])
 
+mean = lambda x: sum(x) / len(x) if len(x) else -1
+
 
 def count_gates(cir:dq.QubitCircuit) -> int:
     count = 0
@@ -340,7 +342,7 @@ class QMNISTDataset(Dataset):
         return data_list
 
     def generate_data_VQC(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
-        from train_single import get_model
+        from amp_enc_vqc import get_model
 
         data_list = []
         for image, label in tqdm(self.sub_dataset):
