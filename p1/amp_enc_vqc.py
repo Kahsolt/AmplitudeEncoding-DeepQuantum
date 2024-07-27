@@ -124,7 +124,7 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
 
 CHECK_GCNT = True
 
-def amplitude_encoding_vqc(tgt:Tensor) -> dq.QubitCircuit:
+def amplitude_encode_vqc(tgt:Tensor) -> dq.QubitCircuit:
   # NOTE: hard encode the config that we're to run distributedly :)
   global CHECK_GCNT
   circ = get_model(n_layer=14).to(device)
@@ -172,7 +172,7 @@ def run_all(args):
     s = time()
     z = snake_reshape_norm_padding(x.unsqueeze(0))
     x, y, z = x.to(device), y.to(device), z.to(device)
-    circ = amplitude_encoding_vqc(z)
+    circ = amplitude_encode_vqc(z)
     t = time()
     save_data.append((x, y, circ))
 
@@ -199,7 +199,7 @@ def run_few(args):
   print('gate count:', count_gates(circ))
   print('param count:', sum([p.numel() for p in circ.parameters()]))
 
-  dataset = QMNISTDatasetDummy(label_list=[0,1,2,3,4], train=False, per_cls_size=args.n_samples//5)
+  dataset = QMNISTDatasetDummy(label_list=[0,1,2,3,4], train=False, per_cls_size=max(1, args.n_samples//5))
 
   fid_list = []
   for idx, (x, y, _) in enumerate(dataset):
