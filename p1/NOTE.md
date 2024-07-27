@@ -74,6 +74,12 @@ test acc: 0.889
 test gates: 253.000
 runtime: 140.611
 客观得分: 352.919
+⚪ local (overfit to testset)
+test fid: 0.916
+test acc: 0.913
+test gates: 253.000
+runtime: 137.816
+客观得分: 355.332
 ⚪ submit
 Fidelity: 0.916
 Accuracy: 0.889

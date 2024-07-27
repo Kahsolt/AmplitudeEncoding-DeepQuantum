@@ -146,6 +146,8 @@ if __name__ == '__main__':
     #dataset = QMNISTDataset(label_list=[0,1,2,3,4], train=True, per_cls_size=1000)
     dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=True, per_cls_size=1000)
     #dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False)
+    #with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
+    #    dataset = pickle.load(file)
     train_size = int(0.7 * len(dataset))
     valid_size = len(dataset) - train_size
     train_dataset, valid_dataset = random_split(dataset, [train_size, valid_size])
