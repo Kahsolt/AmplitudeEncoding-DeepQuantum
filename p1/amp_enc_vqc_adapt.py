@@ -7,6 +7,8 @@
 # => mean(score): 2.576, runtime 20min
 # 默认配置: python amp_enc_vqc_adapt.py
 # => mean(score): 2.608, runtime ~2h
+# 默认配置 (冻结): python amp_enc_vqc_adapt.py --freeze
+# => mean(score): 2.608, runtime ~1.7h = 1h40min
 
 from datetime import datetime
 from amp_enc_vqc import *
