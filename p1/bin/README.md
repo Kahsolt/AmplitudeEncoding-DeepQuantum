@@ -4,7 +4,7 @@
 
 | 环境 | 硬件 | 单线程预计时间 | 运行配置 => 并行预计时间 |
 | :-: | :-: | :-: | :-: |
-| pc   | Core i7-11700K@3.6GHz (8c16p)          | ~174h | 174 / 8线程 ≈ 21.75h |
+| pc1  | Core i7-11700K@3.6GHz (8c16p)          | ~174h | 174 / 8线程 ≈ 21.75h |
 | lab2 | Xeon Silver 4215R@3.2Ghz (8c16p) x2 + Xeon Gold 6226R@2.9Ghz (16c32p) x2 | ~188h | 188h / 总计24线程 ≈ 8h |
 | hw5  | Xeon Platinum 8378C@2.80GHz (8c16p) x5 | ~200h | 200h / 8线程 / 5机器 ≈ 5h |
 | hw6  | Xeon Platinum 8378C@2.80GHz (8c16p) x6 | ~200h | 200h / 8线程 / 6机器 ≈ 4.16h |
