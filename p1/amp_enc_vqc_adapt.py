@@ -13,7 +13,8 @@
 from datetime import datetime
 from amp_enc_vqc import *
 
-if 'logger':
+
+if 'logger' and __name__ == '__main__':
   log_fp = OUTPUT_DIR + '/amp_enc_vqc_adapt.log'
   print('>> log_fp:', log_fp)
   logger = logging.getLogger(__file__)
