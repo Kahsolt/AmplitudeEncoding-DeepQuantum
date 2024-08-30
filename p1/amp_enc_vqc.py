@@ -97,6 +97,10 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
   # n_layer=12, n_gate=217, fid=0.8845824599266052; score=0.8845824599266052*2+(1-217/1000)=2.5521649198532
   # n_layer=11, n_gate=199, fid=0.8601076364517212; score=0.8601076364517212*2+(1-199/1000)=2.5212152729034
   # n_layer=10, n_gate=181, fid=0.8576362848281860; score=0.8576362848281860*2+(1-181/1000)=2.5342725696564
+  # [freq_sorted_reshape] (5 samples estimate)
+  # n_layer=14, n_gate=253, fid=0.9230663657188416; score=0.9230663657188416*2+(1-253/1000)=2.5931327314377
+  # n_layer=13, n_gate=235, fid=0.9084532022476196; score=0.9084532022476196*2+(1-235/1000)=2.5819064044952
+  # n_layer=12, n_gate=217, fid=0.8967987418174743; score=0.8967987418174743*2+(1-217/1000)=2.5765974836349
   if 'swap-like zero init':
     vqc.x(0)
     for i in range(n_layer):
@@ -206,7 +210,7 @@ def run_all(args):
     if not (args.start <= idx < args.stop): continue
 
     s = time()
-    z = snake_reshape_norm_padding(x.unsqueeze(0))
+    z = reshape_norm_padding(x.unsqueeze(0))
     x, y, z = x.to(device), y.to(device), z.to(device)
     circ = amplitude_encode_vqc(z)
     t = time()
@@ -241,7 +245,7 @@ def run_few(args):
   for idx, (x, y, _) in enumerate(dataset):
     if idx > args.n_samples: break
 
-    z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)
+    z = reshape_norm_padding(x.unsqueeze(0))
     #z = reshape_norm_padding(x.unsqueeze(0), use_hijack=False)
     x, y, z = x.to(device), y.to(device), z.to(device)
 

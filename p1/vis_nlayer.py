@@ -33,7 +33,7 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
 ''' Data '''
 dataset = QMNISTDatasetDummy(label_list=[0,1,2,3,4], train=False, per_cls_size=1)
 for idx, (x, y, _) in enumerate(dataset):
-  z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)
+  z = reshape_norm_padding(x.unsqueeze(0))
   x, y, z = x.to(device), y.to(device), z.to(device)
   break
 

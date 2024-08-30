@@ -37,8 +37,8 @@ transform = T.Compose([
 
 mean = lambda x: sum(x) / len(x) if len(x) else -1
 
-avg = torch.Tensor([[[0.3081]]])
-std = torch.Tensor([[[0.1307]]])
+avg = torch.Tensor([[[0.1307]]])
+std = torch.Tensor([[[0.3081]]])
 def normalize(x:Tensor) -> Tensor:
   global avg, std
   avg = avg.to(x.device)
@@ -66,7 +66,9 @@ def count_gates(cir:dq.QubitCircuit) -> int:
 
 def reshape_norm_padding(x:Tensor, use_hijack:bool=True) -> Tensor:
     # NOTE: 因为test脚本不能修改，所以需要在云评测时直接替换具体实现
-    if use_hijack: return snake_reshape_norm_padding(x)
+    if use_hijack:
+        return snake_reshape_norm_padding(x, rev=True)
+        #return freq_sorted_reshape_norm_padding(x)
 
     # x: [B, C=1, H=28, W=28]
     x = x.reshape(x.size(0), -1)
@@ -106,6 +108,21 @@ def snake_reshape_norm_padding(x:Tensor, rev:bool=True) -> Tensor:
         pixels.append(x[:, :, i, j])
     x = torch.cat(pixels, -1)
     if rev: x = x.flip(-1)  # re-roder center to border
+    x = F.pad(x, (0, 1024 - x.size(1)), mode='constant', value=x.min())
+    x = F.normalize(x, p=2, dim=-1)
+    return x.to(torch.complex64)  # [B, D=1024]
+
+loc = None
+
+def freq_sorted_reshape_norm_padding(x:Tensor) -> Tensor:
+    global loc
+    if loc is None:
+        loc = np.load('./output/loc.npy')
+    assert len(x.shape) == 4
+    pixels = []
+    for i, j in loc:
+        pixels.append(x[:, :, i, j])
+    x = torch.cat(pixels, -1)
     x = F.pad(x, (0, 1024 - x.size(1)), mode='constant', value=x.min())
     x = F.normalize(x, p=2, dim=-1)
     return x.to(torch.complex64)  # [B, D=1024]

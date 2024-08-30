@@ -8,7 +8,7 @@ import time
 import pickle
 import matplotlib.pyplot as plt
 
-from utils import snake_reshape_norm_padding, get_fidelity
+from utils import reshape_norm_padding, get_fidelity
 from utils import QMNISTDataset, QMNISTDatasetIdea, DataHolder      # keep for unpickle
 
 t0 = time.time()
@@ -21,7 +21,7 @@ t0 = time.time()
 fid_list = []
 for x, _, z_func in dataset:
   z_hat = z_func()
-  z = snake_reshape_norm_padding(x.unsqueeze(0))
+  z = reshape_norm_padding(x.unsqueeze(0))
   fid = get_fidelity(z_hat, z).item()
   print('fid:', fid)
   fid_list.append(fid)

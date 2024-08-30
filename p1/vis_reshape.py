@@ -2,7 +2,7 @@
 # Author: Armit
 # Create Time: 2024/07/23 
 
-# 探究 向量量化(qt) 和 位序重排(snake) 对保真度的影响
+# 探究 向量量化(qt) 和 位序重排(reshape) 对保真度的影响
 # - qt=1, fid=0.9274693276891914
 # (gate count) gamma=0.01: 819.3545436855419/782.9462930531232
 # (gate count) gamma=0.016: 774.609846273594/767.3010313290523
@@ -107,7 +107,7 @@ for x, y, z_get in tqdm(datatset):
   EPS = 0.001
   GAMMA = 0.022
 
-  z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)   # truth
+  z = reshape_norm_padding(x.unsqueeze(0))   # truth
   z_vqc = amplitude_encode(z.flatten().numpy(), eps=EPS, gamma=GAMMA)
 
   if not 'train':
@@ -135,7 +135,7 @@ for x, y, z_get in tqdm(datatset):
     z_enc_fid.append(z_vqc_fid)
     z_enc_gc .append(z_vqc_gc)
 
-  if not 'plot':
+  if 'plot':
     plt.subplot(131) ; plt.title('x')           ; plt.imshow(img_to_01(x)                                        .permute([1, 2, 0]).numpy())
     plt.subplot(132) ; plt.title('z_snake')     ; plt.imshow(img_to_01(z               .real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
     plt.subplot(133) ; plt.title('z_snake_vqc') ; plt.imshow(img_to_01(z_vqc().detach().real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())

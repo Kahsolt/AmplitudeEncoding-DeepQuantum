@@ -127,7 +127,7 @@ def run(args):
   sc_list = []
   for idx, (x, y, _) in enumerate(dataset):
     # 数据
-    z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)
+    z = reshape_norm_padding(x.unsqueeze(0))
     #z = reshape_norm_padding(x.unsqueeze(0), use_hijack=False)
     z = z.to(device)
     # 训练

@@ -2,3 +2,4 @@ output/*
 !output/*.json
 !output/*.png
 !output/*.log
+!output/*.npy
