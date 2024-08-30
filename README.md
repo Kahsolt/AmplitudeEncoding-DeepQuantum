@@ -33,6 +33,7 @@ Team Name: 我来晚了
   - QGAN
     - https://arxiv.org/abs/1904.00043
 - QAM: https://nvlabs.github.io/sionna/examples/Hello_World.html
+- Encoding techniques for Quantum Machine Learning: https://webthesis.biblio.polito.it/25437/1/tesi.pdf
 
 ----
 by Armit

@@ -147,6 +147,14 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
         g.init_para([0])
         vqc.add(g)
 
+  # n_layer=14, n_gate=266, fid=0.6950063467025757
+  if not 'RY + zigzag(CNOT), arXiv:2103.13211':
+    for i in range(n_layer):
+      vqc.rylayer()
+      for q in range(0, nq, 2):
+        vqc.cnot(q, q+1)
+      for q in range(1, nq-1, 2):
+        vqc.cnot(q, q+1)
   return vqc
 
 

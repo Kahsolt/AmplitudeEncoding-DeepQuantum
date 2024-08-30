@@ -41,3 +41,13 @@ wget -nc https://arxiv.org/pdf/2208.13372.pdf
 
 REM Preparing random state for quantum financing with quantum walks
 wget -nc https://arxiv.org/pdf/2302.12500.pdf
+
+
+REM Approximate amplitude encoding in shallow parameterized quantum circuits and its application to financial market indicator
+wget -nc https://arxiv.org/pdf/2103.13211.pdf
+
+REM Approximate complex amplitude encoding algorithm and its application to data classification problems
+wget -nc https://arxiv.org/pdf/2211.13039.pdf
+
+REM Warm-Starting the VQE with Approximate Complex Amplitude Encoding
+wget -nc https://arxiv.org/pdf/2402.17378.pdf
