@@ -108,6 +108,22 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
         g.init_para([0])
         vqc.add(g)
 
+  # [snake_reshape] (5 samples estimate)
+  # n_layer=14, n_gate=262, fid=0.9085301160812378; score=0.9085301160812378*2+(1-262/1000)=2.5550602321625
+  if not 'RY + swap-like zero init':
+    for q in range(nq):
+        g = dq.Ry(nqubit=nq, wires=q, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+    for i in range(n_layer):
+      for q in range(nq-1):
+        g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+
   if not 'swap-like zero init \/':
     vqc.x(0)
     for i in range(n_layer):
