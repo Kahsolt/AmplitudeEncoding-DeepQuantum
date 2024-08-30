@@ -94,27 +94,6 @@ from utils import *
 from amp_enc import *
 import matplotlib.pyplot as plt
 
-avg = torch.Tensor([[[0.3081]]])
-std = torch.Tensor([[[0.1307]]])
-
-def normalize(x:Tensor) -> Tensor:
-  global avg, std
-  avg = avg.to(x.device)
-  std = std.to(x.device)
-  return (x - avg) / std
-def denormalize(x:Tensor) -> Tensor:
-  global avg, std
-  avg = avg.to(x.device)
-  std = std.to(x.device)
-  return x * std + avg
-
-def img_to_01(x:Tensor) -> Tensor:
-  x = denormalize(x)
-  vmin, vmax = x.min(), x.max()
-  x = (x - vmin) / (vmax - vmin)
-  return x
-
-
 datatset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False, per_cls_size=10)
 
 fid_list = []
@@ -157,9 +136,9 @@ for x, y, z_get in tqdm(datatset):
     z_enc_gc .append(z_vqc_gc)
 
   if not 'plot':
-    plt.subplot(131) ; plt.title('x')              ; plt.imshow(img_to_01(x)                                        .permute([1, 2, 0]).numpy())
-    plt.subplot(132) ; plt.title('z_snake')        ; plt.imshow(img_to_01(z               .real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
-    plt.subplot(133) ; plt.title('z_snake_vqc')    ; plt.imshow(img_to_01(z_vqc().detach().real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
+    plt.subplot(131) ; plt.title('x')           ; plt.imshow(img_to_01(x)                                        .permute([1, 2, 0]).numpy())
+    plt.subplot(132) ; plt.title('z_snake')     ; plt.imshow(img_to_01(z               .real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
+    plt.subplot(133) ; plt.title('z_snake_vqc') ; plt.imshow(img_to_01(z_vqc().detach().real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
     plt.suptitle(f'({z_vqc_gc}; {z_vqc_fid})')
     plt.tight_layout()
     plt.show()

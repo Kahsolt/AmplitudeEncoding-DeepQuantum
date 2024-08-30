@@ -84,13 +84,12 @@ def amplitude_encode_vqc(circ:dq.QubitCircuit, tgt:Tensor, n_iter:int=1000, lr:f
   for i in range(n_iter):
     optimizer.zero_grad()
     state = circ().swapaxes(0, 1)     # [B=1, D=1024]
-    fid = get_fidelity(state, tgt)
-    loss = -fid
+    loss = -get_fidelity(state, tgt)
     loss.backward()
     optimizer.step()
 
     if (i + 1) % 10 == 0:
-      logger.debug(f'>> [{i+1}/{n_iter}] fid: {fid.item()}')
+      logger.debug(f'>> [{i+1}/{n_iter}] fid: {-loss.item()}')
 
     # TODO: 若 fid 的变化已经趋于平稳，10步迭代积累的总变化不超过0.001，则提前返回
     # 你需要定义一些辅助变量来跟踪 fid 的变化情况
@@ -125,7 +124,7 @@ def run(args):
   logger.info(f'[Start Time] {datetime.now()}')
 
   sc_list = []
-  for idx, (x, _, _) in enumerate(dataset):
+  for idx, (x, y, _) in enumerate(dataset):
     # 数据
     z = snake_reshape_norm_padding(x.unsqueeze(0), rev=True)
     #z = reshape_norm_padding(x.unsqueeze(0), use_hijack=False)

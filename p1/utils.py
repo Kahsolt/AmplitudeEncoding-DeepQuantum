@@ -37,6 +37,24 @@ transform = T.Compose([
 
 mean = lambda x: sum(x) / len(x) if len(x) else -1
 
+avg = torch.Tensor([[[0.3081]]])
+std = torch.Tensor([[[0.1307]]])
+def normalize(x:Tensor) -> Tensor:
+  global avg, std
+  avg = avg.to(x.device)
+  std = std.to(x.device)
+  return (x - avg) / std
+def denormalize(x:Tensor) -> Tensor:
+  global avg, std
+  avg = avg.to(x.device)
+  std = std.to(x.device)
+  return x * std + avg
+def img_to_01(x:Tensor) -> Tensor:
+  x = denormalize(x)
+  vmin, vmax = x.min(), x.max()
+  x = (x - vmin) / (vmax - vmin)
+  return x
+
 
 def count_gates(cir:dq.QubitCircuit) -> int:
     count = 0
@@ -355,7 +373,7 @@ class QMNISTDataset(Dataset):
 
             circ = get_model()
             optimizer = optim.Adam(circ.parameters(), lr=0.02)
-            for i in range(N_ITER):
+            for _ in range(N_ITER):
                 state = circ().swapaxes(0, 1)     # [B=1, D=1024]
                 loss = -get_fidelity(state, target)
                 optimizer.zero_grad()
