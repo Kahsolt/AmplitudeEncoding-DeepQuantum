@@ -108,6 +108,7 @@ def snake_reshape_norm_padding(x:Tensor, rev:bool=True) -> Tensor:
         pixels.append(x[:, :, i, j])
     x = torch.cat(pixels, -1)
     if rev: x = x.flip(-1)  # re-roder center to border
+    #x = F.pad(x, (1, 1024 - x.size(1) - 1), mode='constant', value=0.0)
     x = F.pad(x, (0, 1024 - x.size(1)), mode='constant', value=x.min())
     x = F.normalize(x, p=2, dim=-1)
     return x.to(torch.complex64)  # [B, D=1024]
@@ -374,6 +375,8 @@ class QMNISTDataset(Dataset):
                 if no_better_too_much > 5: break
                 last_loss = loss.item()
             data_list.append((image, label, circ))
+        #fid: 0.9700795280884666
+        #gc: 566.318155283129
         return data_list
 
     def generate_data_VQC(self) -> List[Tuple[Tensor, int, dq.QubitCircuit]]:
