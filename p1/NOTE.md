@@ -122,3 +122,17 @@ runtime: 115.154
 > (0.8564713001251221*2 + 0.929 + (1-241/1000) + (1-146/360)*0.1) * 100
 346.03870446947
 ```
+
+### references
+
+- repo
+  - https://github.com/bsiegelwax/784-Dimensional-Quantum-MNIST
+  - https://github.com/TuomasLe/Extended-basis-encoding-and-amplitude-encoding-algorithms-for-Qiskit
+  - https://github.com/Subham-wq/Amplitude-encoding
+  - https://github.com/Quvance/complex_amplitude_encoding
+  - https://github.com/bsiegelwax/Quantum-Classification-of-Amplitudes
+  - https://github.com/esarell/QuantumEncoding
+- blog
+  - https://quantumcomputing.stackexchange.com/questions/33722/how-does-the-induction-step-in-the-grover-rudolph-scheme-to-prepare-superpositio
+  - https://quantumcomputing.stackexchange.com/questions/12104/preparing-a-quantum-state-from-a-classical-probability-distribution
+  - https://towardsdatascience.com/784-dimensional-quantum-mnist-f0adcf1a938c
