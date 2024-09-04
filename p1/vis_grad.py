@@ -16,13 +16,33 @@ N_LAYER = 14
 
 def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
   vqc = dq.QubitCircuit(nq)
-  vqc.x(0)
-  for _ in range(n_layer):
-    for q in range(nq-1):
-      g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
-      g.init_para([0])
-      vqc.add(g)
-      g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+
+  if 'swap-like zero init':
+    vqc.x(0)
+    for _ in range(n_layer):
+      for q in range(nq-1):
+        g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+
+  if not 'RY + [↓↑CRY - RY]*n, zero init':
+    g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+    g.init_para([0])
+    vqc.add(g)
+    for i in range(n_layer):
+      # ↓↑CRY
+      for q in range(1, nq):
+        g = dq.Ry(nqubit=nq, wires=q, controls=0, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=0, controls=q, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+      # RY
+      g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
       g.init_para([0])
       vqc.add(g)
   return vqc

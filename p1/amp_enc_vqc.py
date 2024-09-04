@@ -112,13 +112,28 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
         g.init_para([0])
         vqc.add(g)
 
+  # [snake_reshape] (1 sample estimate)
+  # n_layer=14, n_gate=253, fid=~0.8817921876907349
+  if not 'swap-like zero init, dilated':
+    GAPS = [1, 2, 3, 4, 5]
+    vqc.x(0)
+    for i in range(n_layer):
+      for q in range(nq-1):
+        gap = GAPS[i % len(GAPS)]
+        g = dq.Ry(nqubit=nq, wires=(q+gap)%nq, controls=q, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=q, controls=(q+gap)%nq, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+
   # [snake_reshape] (5 samples estimate)
   # n_layer=14, n_gate=262, fid=0.9085301160812378; score=0.9085301160812378*2+(1-262/1000)=2.5550602321625
   if not 'RY + swap-like zero init':
     for q in range(nq):
-        g = dq.Ry(nqubit=nq, wires=q, requires_grad=True)
-        g.init_para([0])
-        vqc.add(g)
+      g = dq.Ry(nqubit=nq, wires=q, requires_grad=True)
+      g.init_para([0])
+      vqc.add(g)
     for i in range(n_layer):
       for q in range(nq-1):
         g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
@@ -159,6 +174,28 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
         vqc.cnot(q, q+1)
       for q in range(1, nq-1, 2):
         vqc.cnot(q, q+1)
+
+  # [snake_reshape] (1 sample estimate)
+  # n_layer=14, n_gate=267, fid=~0.9390624761581421
+  # n_layer=10, n_gate=191, fid=~0.8758159279823303
+  if not 'RY + [↓↑CRY - RY]*n, zero init':
+    g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+    g.init_para([0])
+    vqc.add(g)
+    for i in range(n_layer):
+      # ↓↑CRY
+      for q in range(1, nq):
+        g = dq.Ry(nqubit=nq, wires=q, controls=0, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=0, controls=q, condition=True, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+      # RY
+      g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+      g.init_para([0])
+      vqc.add(g)
+
   return vqc
 
 
