@@ -105,13 +105,51 @@ class QuantumNeuralNetwork(nn.Module):
                     else:      self.var_circuit.cry(q, q + 1)
             self.var_circuit.u3layer()
 
-        if 'mera-updown-cu':        # 88.333%/92.667%; gcnt=445, pcnt=1335
+        # gcnt=445, pcnt=1335; (88.333%/92.667%)
+        if not 'mera-updown-cu':
             for i in range(self.n_layer):
                 self.var_circuit.u3layer()
                 offset = int(i % 2 == 1)
                 for q in range(offset, self.n_qubit - offset, 2):
                     if offset: self.var_circuit.cu(q + 1, q)
                     else:      self.var_circuit.cu(q, q + 1)
+            self.var_circuit.u3layer()
+
+        # n_layer=8,  gcnt=404, pcnt=1212
+        # n_layer=10, gcnt=500, pcnt=1500
+        if 'real mera-like':
+            for i in range(self.n_layer):
+                # down (->10-8-6-4-2)
+                for offset in range(self.n_qubit // 2):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
+                        self.var_circuit.cu(q + 1, q)
+                # up (->4-6-8)
+                for offset in range(self.n_qubit // 2 - 2, 0, -1):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
+                        self.var_circuit.cu(q + 1, q)
+            if 'last up (->10)':
+                for q in range(0, self.n_qubit - 1, 2):
+                    self.var_circuit.cu(q, q + 1)
+                    self.var_circuit.cu(q + 1, q)
+            self.var_circuit.u3layer()
+
+        # n_layer=10, gcnt=255, pcnt=765  (70.286%/64.667%)
+        # n_layer=20, gcnt=495, pcnt=1485 (76.000%/67.333%)
+        if not 'real mera-like, down↓up↑':
+            for i in range(self.n_layer):
+                # down (->10-8-6-4-2)
+                for offset in range(self.n_qubit // 2):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
+                # up (->4-6-8)
+                for offset in range(self.n_qubit // 2 - 2, 0, -1):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q + 1, q)
+            if 'last up (->10)':
+                for q in range(0, self.n_qubit - 1, 2):
+                    self.var_circuit.cu(q + 1, q)
             self.var_circuit.u3layer()
 
         if not 'mera-updown CNOT control(z-y-z) + target(x-y-x)':   # 87.133%/91.133%

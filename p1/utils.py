@@ -319,7 +319,10 @@ class QMNISTDataset(Dataset):
     def __getitem__(self, idx):
         sample = self.data_list[idx]
         x = sample[0]
-        y = torch.tensor(sample[1], dtype=torch.long)
+        if isinstance(sample[1], torch.Tensor):
+            y = sample[1].clone().detach()
+        else:
+            y = torch.tensor(sample[1], dtype=torch.long)
         z = sample[2]
         return x, y, z
 

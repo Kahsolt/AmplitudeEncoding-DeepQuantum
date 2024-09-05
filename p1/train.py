@@ -103,7 +103,7 @@ def train_model(model:QuantumNeuralNetwork, optimizer:optim.Optimizer, train_loa
             json.dump(history, fh, indent=2, ensure_ascii=False)
 
         ''' Ckpt '''
-        torch.save(model.state_dict(), os.path.join(output_dir, f"model_epoch={epoch}.pt"))
+        #torch.save(model.state_dict(), os.path.join(output_dir, f"model_epoch={epoch}.pt"))
 
         if valid_loss < best_valid_loss:
             print(f'>> New best found {best_valid_loss:.7f} => {valid_loss:.7f}')
@@ -144,6 +144,7 @@ if __name__ == '__main__':
 
     # Data
     #dataset = QMNISTDataset(label_list=[0,1,2,3,4], train=True, per_cls_size=1000)
+    #dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=True, per_cls_size=1000)
     dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=True, per_cls_size=1000)
     #dataset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False)
     #with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
@@ -155,7 +156,7 @@ if __name__ == '__main__':
     valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)
  
     # Model
-    model_config = {'n_qubit': 10, 'n_layer': 30}
+    model_config = {'n_qubit': 10, 'n_layer': 10}
     model = QuantumNeuralNetwork(**model_config)
     model = model.train().to(DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=0.1)
