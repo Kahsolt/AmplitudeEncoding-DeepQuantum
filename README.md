@@ -5,7 +5,7 @@
 ----
 
 Contest page: [http://ac-innovation.com/entryInformation/entryDetail?_t=texBUA9y%2BdZhRtD8%2FqAteuRK4wxWuHixgeftjct5SM0%3D](http://ac-innovation.com/entryInformation/entryDetail?_t=texBUA9y%2BdZhRtD8%2FqAteuRK4wxWuHixgeftjct5SM0%3D)  
-Team Name: 我来晚了  
+Team Name: 量子探索队  
 
 
 ### Quickstart
