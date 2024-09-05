@@ -104,7 +104,7 @@ plt.clf()
 plt.plot(grad_mean_list)
 plt.suptitle('grad-mean')
 plt.tight_layout()
-plt.savefig('./output/grad-mean.png', dpi=400)
+plt.savefig('./img/grad-mean.png', dpi=400)
 plt.show()
 
 plt.clf()
@@ -112,7 +112,7 @@ for grads in grads_list:
   plt.plot(grads)
 plt.suptitle('grad')
 plt.tight_layout()
-plt.savefig('./output/grad.png', dpi=600)
+plt.savefig('./img/grad.png', dpi=600)
 plt.show()
 
 plt.clf()
@@ -120,7 +120,7 @@ for params in params_list:
   plt.plot(params)
 plt.suptitle('param')
 plt.tight_layout()
-plt.savefig('./output/param.png', dpi=600)
+plt.savefig('./img/param.png', dpi=600)
 plt.show()
 
 ops = circ.operators

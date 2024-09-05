@@ -29,4 +29,4 @@ t1 = time.time()
 print(f'>> calc fidelity done ({t1 - t0:.3f}s)')
 
 plt.hist(fid_list, bins=50)
-plt.savefig('./output/stats_fid.png', dpi=400)
+plt.savefig('./img/stats_fid.png', dpi=400)

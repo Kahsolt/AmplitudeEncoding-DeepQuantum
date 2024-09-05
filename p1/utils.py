@@ -118,7 +118,7 @@ loc = None
 def freq_sorted_reshape_norm_padding(x:Tensor) -> Tensor:
     global loc
     if loc is None:
-        loc = np.load('./output/loc.npy')
+        loc = np.load('./img/loc.npy')
     assert len(x.shape) == 4
     pixels = []
     for i, j in loc:

@@ -75,5 +75,5 @@ for ax_row in axs:
     ax.axis('off')
 plt.suptitle('Abaltion on n_layer')
 plt.tight_layout()
-plt.savefig('./output/vis_nlayer.png', dpi=800)
+plt.savefig('./img/vis_nlayer.png', dpi=800)
 plt.show()

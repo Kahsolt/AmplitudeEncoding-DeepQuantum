@@ -27,14 +27,14 @@ plt.figure(figsize=(14, 10))
 sns.heatmap(map_cnt, cmap='Reds', fmt='d', annot=True)
 plt.suptitle('vis_sample_cnt')
 plt.tight_layout()
-plt.savefig('./output/vis_sample_cnt.png', dpi=400)
+plt.savefig('./img/vis_sample_cnt.png', dpi=400)
 
 plt.clf()
 plt.figure(figsize=(14, 10))
 sns.heatmap(map_avg, cmap='Reds', fmt='d', annot=True)
 plt.suptitle('vis_sample_avg')
 plt.tight_layout()
-plt.savefig('./output/vis_sample_avg.png', dpi=400)
+plt.savefig('./img/vis_sample_avg.png', dpi=400)
 
 avg_empty = (avg == 0).sum()
 # >> empty: 313 (ratio: 0.39923468232154846)
@@ -54,4 +54,4 @@ cnt_loc.sort(key=cmp)
 loc_list = [loc for cnt, loc in cnt_loc if cnt]   # [(x, y)]
 # len(loc_list): 471
 print('len(loc_list):', len(loc_list))
-np.save('./output/loc.npy', np.asarray(loc_list, dtype=np.uint8))
+np.save('./img/loc.npy', np.asarray(loc_list, dtype=np.uint8))
