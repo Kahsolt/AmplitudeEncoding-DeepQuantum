@@ -103,6 +103,14 @@ test acc: 0.910
 test gates: 217.000
 runtime: 115.154
 客观得分: 354.698
+
+[5th solution] (VQC n_layer=12 + snake + train(step=1000); mera-like [u3-enc-u3-dec]-enc-u3)
+⚪ local
+test fid: 0.916
+test acc: 0.935
+test gates: 253.000
+runtime: 148.048
+客观得分: 357.227
 ```
 
 得分模板

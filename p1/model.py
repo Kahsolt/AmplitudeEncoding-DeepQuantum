@@ -117,7 +117,7 @@ class QuantumNeuralNetwork(nn.Module):
 
         # n_layer=8,  gcnt=404, pcnt=1212
         # n_layer=10, gcnt=500, pcnt=1500
-        if 'real mera-like':
+        if not 'real mera-like, [enc-dec]-u3':
             for i in range(self.n_layer):
                 # down (->10-8-6-4-2)
                 for offset in range(self.n_qubit // 2):
@@ -137,7 +137,7 @@ class QuantumNeuralNetwork(nn.Module):
 
         # n_layer=10, gcnt=255, pcnt=765  (70.286%/64.667%)
         # n_layer=20, gcnt=495, pcnt=1485 (76.000%/67.333%)
-        if not 'real mera-like, down↓up↑':
+        if not 'real mera-like, [enc↓-dec↑]-u3':
             for i in range(self.n_layer):
                 # down (->10-8-6-4-2)
                 for offset in range(self.n_qubit // 2):
@@ -150,6 +150,63 @@ class QuantumNeuralNetwork(nn.Module):
             if 'last up (->10)':
                 for q in range(0, self.n_qubit - 1, 2):
                     self.var_circuit.cu(q + 1, q)
+            self.var_circuit.u3layer()
+
+        # n_layer=10, gcnt=241, pcnt=723 (92.286%/91.200%)  # NOTE: nice!!
+        if not 'real mera-like, [enc↓-dec↑]-enc↓-u3':
+            for i in range(self.n_layer):
+                # down (->10-8-6-4-2)
+                for offset in range(self.n_qubit // 2):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
+                if i < self.n_layer-1:
+                    # up (->4-6-8)
+                    for offset in range(self.n_qubit // 2 - 2, 0, -1):
+                        for q in range(offset, self.n_qubit - 1 - offset, 2):
+                            self.var_circuit.cu(q + 1, q)
+            self.var_circuit.u3layer()
+
+        # n_layer=8, gcnt=273, pcnt=819 (92.914%/91.933%)   # NOTE: nice!!
+        if not 'real mera-like, [u3-enc↓-dec↑]-enc↓-u3':
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                # down (->10-8-6-4-2)
+                for offset in range(self.n_qubit // 2):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
+                if i < self.n_layer-1:
+                    # up (->4-6-8)
+                    for offset in range(self.n_qubit // 2 - 2, 0, -1):
+                        for q in range(offset, self.n_qubit - 1 - offset, 2):
+                            self.var_circuit.cu(q + 1, q)
+            self.var_circuit.u3layer()
+
+        # n_layer=6, gcnt=352, pcnt=1056 (92.600%/92.600%)  # NOTE: very nice!!
+        if 'real mera-like, [u3-enc-u3-dec]-enc-u3':
+            for i in range(self.n_layer):
+                self.var_circuit.u3layer()
+                # down (->10-8-6-4-2)
+                for offset in range(self.n_qubit // 2):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
+                        self.var_circuit.cu(q + 1, q)
+                if i < self.n_layer-1:
+                    self.var_circuit.u3layer(wires=[4, 5])
+                    # up (->2-4-6-8)
+                    for offset in range(self.n_qubit // 2 - 1, 0, -1):
+                        for q in range(offset, self.n_qubit - 1 - offset, 2):
+                            self.var_circuit.cu(q + 1, q)
+                            self.var_circuit.cu(q, q + 1)
+            self.var_circuit.u3layer(wires=[4, 5])
+
+        # n_layer=10, gcnt=160, pcnt=480 (88.057%/88.733%)
+        # n_layer=15, gcnt=235, pcnt=705 (89.029%/89.067%)
+        if not 'real mera-like, down↓ only':
+            for i in range(self.n_layer):
+                # down (->10-8-6-4-2)
+                for offset in range(self.n_qubit // 2):
+                    for q in range(offset, self.n_qubit - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
             self.var_circuit.u3layer()
 
         if not 'mera-updown CNOT control(z-y-z) + target(x-y-x)':   # 87.133%/91.133%
@@ -211,11 +268,19 @@ class QuantumNeuralNetwork(nn.Module):
                     self.var_circuit.cry((q+1)%self.n_qubit, q)
 
         # num of observable == num of classes
-        self.var_circuit.observable(wires=0, basis='z')
-        self.var_circuit.observable(wires=1, basis='z')
-        self.var_circuit.observable(wires=0, basis='x')
-        self.var_circuit.observable(wires=1, basis='x')
-        self.var_circuit.observable(wires=0, basis='y')
+        if not 'original q0,q1':
+            self.var_circuit.observable(wires=0, basis='z')
+            self.var_circuit.observable(wires=1, basis='z')
+            self.var_circuit.observable(wires=0, basis='x')
+            self.var_circuit.observable(wires=1, basis='x')
+            self.var_circuit.observable(wires=0, basis='y')
+
+        if 'mera q4,q5':
+            self.var_circuit.observable(wires=4, basis='z')
+            self.var_circuit.observable(wires=5, basis='z')
+            self.var_circuit.observable(wires=4, basis='x')
+            self.var_circuit.observable(wires=5, basis='x')
+            self.var_circuit.observable(wires=4, basis='y')
 
         print('classifier gate count:', count_gates(self.var_circuit))
 

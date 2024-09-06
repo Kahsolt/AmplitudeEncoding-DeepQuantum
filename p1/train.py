@@ -156,7 +156,7 @@ if __name__ == '__main__':
     valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)
  
     # Model
-    model_config = {'n_qubit': 10, 'n_layer': 10}
+    model_config = {'n_qubit': 10, 'n_layer': 6}
     model = QuantumNeuralNetwork(**model_config)
     model = model.train().to(DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=0.1)
