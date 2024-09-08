@@ -196,6 +196,139 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
       g.init_para([0])
       vqc.add(g)
 
+  # n_layer=4, n_gate=236, fid=~0.9358370900154114
+  if not 'mera-like, skel (un-modified)':
+    for i in range(n_layer):
+      vqc.rylayer()
+      # down (->10-8-6-4-2)
+      for offset in range(nq // 2):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q, q + 1)
+          vqc.cry(q + 1, q)
+      if i < n_layer-1:
+        vqc.rylayer(wires=[4, 5])
+        # up (->2-4-6-8)
+        for offset in range(nq // 2 - 1, 0, -1):
+          for q in range(offset, nq - 1 - offset, 2):
+            vqc.cry(q + 1, q)
+            vqc.cry(q, q + 1)
+    vqc.rylayer()
+
+  # n_layer=4, n_gate=258, fid=~0.9281691908836365
+  if not 'mera-like, init-[enc-ry-dec-ry]':
+    # init
+    vqc.rylayer()
+    # [enc-ry-dec-ry]
+    for i in range(n_layer):
+      # down (->10-8-6-4-2)
+      for offset in range(nq // 2):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q, q + 1)
+          vqc.cry(q + 1, q)
+      vqc.rylayer(wires=[4, 5])
+      # up (->4-6-8-10)
+      for offset in range(nq // 2 - 1, 0, -1):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q + 1, q)
+          vqc.cry(q, q + 1)
+      vqc.rylayer()
+
+  # n_layer=4, n_gate=210, fid=~0.9031393527984619
+  if not 'mera-like, init-[enc-dec]':
+    # init
+    vqc.rylayer()
+    # [enc-dec]
+    for i in range(n_layer):
+      # down (->10-8-6-4-2)
+      for offset in range(nq // 2):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q, q + 1)
+          vqc.cry(q + 1, q)
+      # up (->4-6-8-10)
+      for offset in range(nq // 2 - 1, 0, -1):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q + 1, q)
+          vqc.cry(q, q + 1)
+
+  # n_layer=4, n_gate=279, fid=~0.9503393769264221
+  if not 'mera-like, init-[dec-ry-enc-ry]-dec':
+    # init
+    pivot = nq // 2 - 1
+    vqc.ry(wires=[pivot])
+    # [dec-ry-enc-ry]
+    for i in range(n_layer):
+      # up (->2-4-6-8-10)
+      for offset in range(nq // 2 - 1, -1, -1):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q + 1, q)
+          vqc.cry(q, q + 1)
+      vqc.rylayer()
+      # down (->8-6-4-2)
+      for offset in range(1, nq // 2):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q, q + 1)
+          vqc.cry(q + 1, q)
+      vqc.rylayer(wires=[pivot, pivot+1])
+    # dec
+    for offset in range(nq // 2 - 1, -1, -1):
+      for q in range(offset, nq - 1 - offset, 2):
+        vqc.cry(q + 1, q)
+        vqc.cry(q, q + 1)
+
+  # n_layer=4, n_gate=231, fid=~0.9109880328178406
+  if not 'mera-like, init-[dec-enc]-dec':
+    # init
+    pivot = nq // 2 - 1
+    vqc.ry(wires=[pivot])
+    # [dec-enc]
+    for i in range(n_layer):
+      # up (->2-4-6-8-10)
+      for offset in range(nq // 2 - 1, -1, -1):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q + 1, q)
+          vqc.cry(q, q + 1)
+      # down (->8-6-4-2)
+      for offset in range(1, nq // 2):
+        for q in range(offset, nq - 1 - offset, 2):
+          vqc.cry(q, q + 1)
+          vqc.cry(q + 1, q)
+    # dec
+    for offset in range(nq // 2 - 1, -1, -1):
+      for q in range(offset, nq - 1 - offset, 2):
+        vqc.cry(q + 1, q)
+        vqc.cry(q, q + 1)
+
+  # n_layer=4, n_gate=173, fid=~0.8660510778427124
+  # n_layer=5, n_gate=211, fid=~0.8980904817581177
+  # n_layer=6, n_gate=249, fid=~0.9232343435287476
+  if not 'distro-like':
+    # init
+    pivot = nq // 2 - 1
+    vqc.ry(wires=[pivot])
+    # up ([4,5] -> [[0,1], [8,9]])
+    for offset in range(1, pivot+1):
+      vqc.cry(pivot - offset, pivot - offset + 1)
+      vqc.cry(pivot - offset + 1, pivot - offset)
+      vqc.cry(pivot + offset, pivot + offset + 1)
+      vqc.cry(pivot + offset + 1, pivot + offset)
+    vqc.rylayer(wires=[0, 1, nq-2, nq-1])
+    # enc-dec reps
+    for i in range(n_layer):
+      # down ([[1,2], [7,8]] -> [4,5])
+      for offset in range(pivot - 1, -1, -1):
+        vqc.cry(pivot - offset, pivot - offset + 1)
+        vqc.cry(pivot - offset + 1, pivot - offset)
+        vqc.cry(pivot + offset, pivot + offset + 1)
+        vqc.cry(pivot + offset + 1, pivot + offset)
+      vqc.rylayer(wires=[pivot, pivot+1])
+      # up ([4,5] -> [[0,1], [8,9]])
+      for offset in range(1, pivot+1):
+        vqc.cry(pivot - offset, pivot - offset + 1)
+        vqc.cry(pivot - offset + 1, pivot - offset)
+        vqc.cry(pivot + offset, pivot + offset + 1)
+        vqc.cry(pivot + offset + 1, pivot + offset)
+      vqc.rylayer(wires=[0, 1, nq-2, nq-1])
+
   return vqc
 
 
