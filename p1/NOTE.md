@@ -140,6 +140,8 @@ runtime: 148.048
   - https://github.com/Quvance/complex_amplitude_encoding
   - https://github.com/bsiegelwax/Quantum-Classification-of-Amplitudes
   - https://github.com/esarell/QuantumEncoding
+  - https://github.com/sophchoe/Continous-Variable-Quantum-MNIST-Classifiers
+  - https://github.com/sophchoe/Hybrid-Quantum-Classical-MNIST-Classfication-Model
 - blog
   - https://quantumcomputing.stackexchange.com/questions/33722/how-does-the-induction-step-in-the-grover-rudolph-scheme-to-prepare-superpositio
   - https://quantumcomputing.stackexchange.com/questions/12104/preparing-a-quantum-state-from-a-classical-probability-distribution

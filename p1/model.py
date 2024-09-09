@@ -6,8 +6,9 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.utils.data import DataLoader
 import deepquantum as dq
+import numpy as np
 
-from utils import QMNISTDataset, cir_collate_fn, get_fidelity, reshape_norm_padding, count_gates
+from utils import QMNISTDataset, cir_collate_fn, get_fidelity, reshape_norm_padding, count_gates, reshape_norm_padding
 
 
 # 注意: 选手的模型名字必须固定为 QuantumNeuralNetwork
@@ -301,6 +302,52 @@ class QuantumNeuralNetwork(nn.Module):
         self.var_circuit(state=z)
         output = self.var_circuit.expectation()     
         return output
+
+
+class HadamardTest(nn.Module):
+
+    ''' This is the non-parametrical quantum kNN :( '''
+
+    def __init__(self, n_qubit:int, n_layer:int):
+        super().__init__()
+        self.nq = n_qubit
+        self.n_qubit = 2 * n_qubit + 1
+        self.anc = self.n_qubit - 1     # idx of ancilla
+        print('>> self.anc:', self.anc)
+        self.canon = torch.from_numpy(np.load('./img/canon.npy')).unsqueeze_(dim=1)    # [NC=5, C=1, H, W], already normalized
+        self.n_cls = len(self.canon)
+
+    def load_state_dict(*args, **kwargs):
+        pass
+
+    @torch.inference_mode()
+    def inference(self, z:Tensor) -> Tensor:
+        n_samples = z.shape[0]
+        output = torch.zeros([n_samples, self.n_cls], dtype=torch.float32)
+        for i in range(n_samples):     # sample
+            val = z[i].flatten()
+            for c in range(self.n_cls): # class
+                ref = reshape_norm_padding(self.canon[c].unsqueeze(0)).squeeze(0).to(val.device)
+                # |psi,phi,anc>
+                init = torch.kron(torch.kron(val, ref), torch.tensor([1, 0], dtype=torch.cfloat, device=val.device))
+
+                # Hadamard test circuit
+                qc = dq.QubitCircuit(self.n_qubit)
+                qc(state=init)      # init data encoding
+                qc.h(self.anc)      # ancilla qubit
+                for i in range(self.nq):
+                    qc.cswap(self.anc, i, i + self.nq)
+                qc.h(self.anc)
+                qc.observable(wires=self.anc, basis='z')
+
+                exp = qc.expectation().item()
+                print('>> exp:', exp)
+                output[i][c] = exp
+        breakpoint()
+        return output
+
+# NOTE: force naming replace!
+QuantumNeuralNetwork = HadamardTest
 
 
 if __name__ == '__main__':

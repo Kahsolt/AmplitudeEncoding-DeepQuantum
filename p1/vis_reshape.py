@@ -89,61 +89,94 @@ vqc gate_count(qt): 406.46
 '''
 
 from time import time
+from argparse import ArgumentParser
+
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
 
 from utils import *
 from amp_enc import *
-import matplotlib.pyplot as plt
 
-datatset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False, per_cls_size=10)
 
-fid_list = []
-z_enc_gc = []
-z_enc_fid = []
-for x, y, z_get in tqdm(datatset):
-  # x: [1, 28, 28]
-  # z = z_get()
-  # z: [1, 1024] := reshape_norm_padding(x.unsqueeze(0))
+def run_bulk():
+  datatset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False, per_cls_size=51)
+  z_imgs = []
+  for x, _, _ in tqdm(datatset):
+    z = reshape_norm_padding(x.unsqueeze(0))
+    z_im = img_to_01(z.real.reshape(-1, 32, 32)).permute([1, 2, 0])
+    z_imgs.append(z_im)
+  z_imgs = torch.stack(z_imgs).permute([0, 3, 1, 2])
+  print('z_imgs.shape:', z_imgs.shape)
+  Z = make_grid(z_imgs, nrow=16)
+  print('Z.shape:', Z.shape)
 
-  EPS = 0.001
-  GAMMA = 0.022
+  plt.imshow(Z.permute(1, 2, 0).numpy())
+  plt.suptitle('vis_snake_bulk')
+  plt.show()
 
-  z = reshape_norm_padding(x.unsqueeze(0))   # truth
-  z_vqc = amplitude_encode(z.flatten().numpy(), eps=EPS, gamma=GAMMA)
 
-  if not 'train':
-    N_ITER = 100
+def run():
+  datatset = QMNISTDatasetIdea(label_list=[0,1,2,3,4], train=False, per_cls_size=10)
 
-    s = time()
-    optimizer = optim.Adam(z_vqc.parameters(), lr=0.02)
-    for i in range(N_ITER):
-      state = z_vqc().swapaxes(0, 1)     # [B=1, D=1024]
-      loss = -get_fidelity(state, z)
-      optimizer.zero_grad()
-      loss.backward()
-      optimizer.step()
-      if i % 10 == 0:
-        print('fid:', -loss.item())
-    t = time()
-    state = z_vqc().swapaxes(0, 1)
-    print(f'>> Fidelity:', get_fidelity(state, z).item(), f'(time: {t - s})')
+  fid_list = []
+  z_enc_gc = []
+  z_enc_fid = []
+  for x, y, z_get in tqdm(datatset):
+    # x: [1, 28, 28]
+    # z = z_get()
+    # z: [1, 1024] := reshape_norm_padding(x.unsqueeze(0))
 
-  if 'vqc fid & gate cnt':
-    z_vqc_fid = get_fidelity(z_vqc(), z).item()
-    z_vqc_gc  = count_gates(z_vqc)
-    print('z_vqc_fid:', z_vqc_fid)
-    print('z_vqc_gc:',  z_vqc_gc)
-    z_enc_fid.append(z_vqc_fid)
-    z_enc_gc .append(z_vqc_gc)
+    EPS = 0.001
+    GAMMA = 0.022
 
-  if 'plot':
-    plt.subplot(131) ; plt.title('x')           ; plt.imshow(img_to_01(x)                                        .permute([1, 2, 0]).numpy())
-    plt.subplot(132) ; plt.title('z_snake')     ; plt.imshow(img_to_01(z               .real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
-    plt.subplot(133) ; plt.title('z_snake_vqc') ; plt.imshow(img_to_01(z_vqc().detach().real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
-    plt.suptitle(f'({z_vqc_gc}; {z_vqc_fid})')
-    plt.tight_layout()
-    plt.show()
+    z = reshape_norm_padding(x.unsqueeze(0))   # truth
+    z_vqc = amplitude_encode(z.flatten().numpy(), eps=EPS, gamma=GAMMA)
 
-print('qt approx fid:', mean(fid_list))
+    if not 'train':
+      N_ITER = 100
 
-print('vqc fidelity:',   mean(z_enc_fid))
-print('vqc gate_count:', mean(z_enc_gc))
+      s = time()
+      optimizer = optim.Adam(z_vqc.parameters(), lr=0.02)
+      for i in range(N_ITER):
+        state = z_vqc().swapaxes(0, 1)     # [B=1, D=1024]
+        loss = -get_fidelity(state, z)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        if i % 10 == 0:
+          print('fid:', -loss.item())
+      t = time()
+      state = z_vqc().swapaxes(0, 1)
+      print(f'>> Fidelity:', get_fidelity(state, z).item(), f'(time: {t - s})')
+
+    if 'vqc fid & gate cnt':
+      z_vqc_fid = get_fidelity(z_vqc(), z).item()
+      z_vqc_gc  = count_gates(z_vqc)
+      print('z_vqc_fid:', z_vqc_fid)
+      print('z_vqc_gc:',  z_vqc_gc)
+      z_enc_fid.append(z_vqc_fid)
+      z_enc_gc .append(z_vqc_gc)
+
+    if 'plot':
+      plt.subplot(131) ; plt.title('x')           ; plt.imshow(img_to_01(x)                                        .permute([1, 2, 0]).numpy())
+      plt.subplot(132) ; plt.title('z_snake')     ; plt.imshow(img_to_01(z               .real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
+      plt.subplot(133) ; plt.title('z_snake_vqc') ; plt.imshow(img_to_01(z_vqc().detach().real.reshape(-1, 32, 32)).permute([1, 2, 0]).numpy())
+      plt.suptitle(f'({z_vqc_gc}; {z_vqc_fid})')
+      plt.tight_layout()
+      plt.show()
+
+  print('qt approx fid:', mean(fid_list))
+
+  print('vqc fidelity:',   mean(z_enc_fid))
+  print('vqc gate_count:', mean(z_enc_gc))
+
+
+if __name__ == '__main__':
+  parser = ArgumentParser()
+  parser.add_argument('--bulk', action='store_true')
+  args = parser.parse_args()
+
+  if args.bulk:
+    run_bulk()
+  else:
+    run()

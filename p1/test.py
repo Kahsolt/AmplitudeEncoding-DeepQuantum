@@ -68,6 +68,13 @@ if __name__ == '__main__':
     OUTPUT_DIR = "output"
     BATCH_SIZE = 514    # test samples: 5139
 
+    # 模型
+    with open(f'{OUTPUT_DIR}/model_config.pkl', 'rb') as file:
+        model_config = pickle.load(file)
+    model = QuantumNeuralNetwork(**model_config)
+    model.load_state_dict(torch.load(f'{OUTPUT_DIR}/best_model.pt', map_location=torch.device('cpu')))
+    print('>> load model done')
+
     # 数据集
     t0 = time.time()
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
@@ -79,14 +86,8 @@ if __name__ == '__main__':
         raise RuntimeError('>> Error: test_dataset is not valid')
     t1 = time.time()
     print(f'>> check dataset done ({t1 - t0:.3f}s)')
-
-    # 模型
     test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=cir_collate_fn)
-    with open(f'{OUTPUT_DIR}/model_config.pkl', 'rb') as file:
-        model_config = pickle.load(file)
-    model = QuantumNeuralNetwork(**model_config)
-    model.load_state_dict(torch.load(f'{OUTPUT_DIR}/best_model.pt', map_location=torch.device('cpu')))
-    print('>> load model done')
+    print('>> load data done')
 
     # 模型理智检查
     if not 'sanity check':
