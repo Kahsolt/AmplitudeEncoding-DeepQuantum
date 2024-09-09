@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 #import torch.profiler as profiler
 #from sklearn.metrics import confusion_matrix
+from tqdm import tqdm
 
 from model import QuantumNeuralNetwork
 from utils import MNISTDataset, cir_collate_fn, reshape_norm_padding, get_fidelity, get_acc
@@ -32,7 +33,7 @@ def test_model(model:QuantumNeuralNetwork, test_loader:DataLoader, device:torch.
     y_true = []
 
     model = model.eval().to(device)
-    for x, y, z in test_loader:
+    for x, y, z in tqdm(test_loader):
         x, y, z = x.to(device), y.to(device), z.to(device)
         output = model.inference(z)
 

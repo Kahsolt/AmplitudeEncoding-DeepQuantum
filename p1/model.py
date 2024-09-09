@@ -1,3 +1,4 @@
+import pickle
 from typing import Tuple
 
 import torch
@@ -9,6 +10,7 @@ import deepquantum as dq
 import numpy as np
 
 from utils import QMNISTDataset, cir_collate_fn, get_fidelity, reshape_norm_padding, count_gates, reshape_norm_padding
+from amp_enc import amplitude_encode
 
 
 # 注意: 选手的模型名字必须固定为 QuantumNeuralNetwork
@@ -324,7 +326,7 @@ class HadamardTest(nn.Module):
     def inference(self, z:Tensor) -> Tensor:
         n_samples = z.shape[0]
         output = torch.zeros([n_samples, self.n_cls], dtype=torch.float32)
-        for i in range(n_samples):     # sample
+        for i in range(n_samples):      # sample
             val = z[i].flatten()
             for c in range(self.n_cls): # class
                 ref = reshape_norm_padding(self.canon[c].unsqueeze(0)).squeeze(0).to(val.device)
@@ -332,22 +334,61 @@ class HadamardTest(nn.Module):
                 init = torch.kron(torch.kron(val, ref), torch.tensor([1, 0], dtype=torch.cfloat, device=val.device))
 
                 # Hadamard test circuit
-                qc = dq.QubitCircuit(self.n_qubit)
-                qc(state=init)      # init data encoding
+                qc = dq.QubitCircuit(self.n_qubit, init_state=init)
                 qc.h(self.anc)      # ancilla qubit
                 for i in range(self.nq):
                     qc.cswap(self.anc, i, i + self.nq)
                 qc.h(self.anc)
                 qc.observable(wires=self.anc, basis='z')
+                qc.to(val.device)
 
+                qc()    # run
                 exp = qc.expectation().item()
-                print('>> exp:', exp)
                 output[i][c] = exp
-        breakpoint()
         return output
 
+
+class Degenerator(nn.Module):
+
+    ''' This is also the non-parametrical quantum kNN, but using no extra qubits :) '''
+
+    def __init__(self, n_qubit:int, n_layer:int):
+        super().__init__()
+        self.n_qubit = n_qubit
+        self.canon = torch.from_numpy(np.load('./img/canon.npy')).unsqueeze_(dim=1)    # [NC=5, C=1, H, W], already normalized
+        self.n_cls = len(self.canon)
+        self.canon_qc = [
+            amplitude_encode(reshape_norm_padding(self.canon[c].unsqueeze(0)).squeeze(0).real.cpu().numpy()).inverse()
+            for c in range(self.n_cls)
+        ]
+
+    def load_state_dict(*args, **kwargs):
+        pass
+
+    @torch.inference_mode()
+    def inference(self, z:Tensor) -> Tensor:
+        n_samples = z.shape[0]
+        output = torch.zeros([n_samples, self.n_cls], dtype=torch.float32)
+        for i in range(n_samples):     # sample
+            init = z[i].flatten()
+            for c in range(self.n_cls): # class
+                qc_canon = self.canon_qc[c].to(init.device)
+                qc_canon_copy: dq.QubitCircuit = pickle.loads(pickle.dumps(qc_canon))
+
+                # Hadamard test circuit
+                qc = dq.QubitCircuit(self.n_qubit, init_state=init) + qc_canon_copy
+                qc.observable(wires=0, basis='z')
+                qc.to(init.device)
+
+                qc()    # run
+                exp = qc.expectation().item()
+                output[i][c] = exp
+        return output
+
+
 # NOTE: force naming replace!
-QuantumNeuralNetwork = HadamardTest
+#QuantumNeuralNetwork = HadamardTest
+#QuantumNeuralNetwork = Degenerator
 
 
 if __name__ == '__main__':

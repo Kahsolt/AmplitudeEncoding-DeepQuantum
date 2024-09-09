@@ -42,10 +42,10 @@ def init_circ(n_layer:int, nq:int=10) -> dq.QubitCircuit:
   vqc.x(0)
   for _ in range(n_layer):
     for q in range(nq-1):
-      g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+      g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, requires_grad=True)
       g.init_para([0])
       vqc.add(g)
-      g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+      g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, requires_grad=True)
       g.init_para([0])
       vqc.add(g)
   
@@ -64,10 +64,10 @@ def upgrade_circ(circ:dq.QubitCircuit, freeze:bool=False) -> dq.QubitCircuit:
 
   nq = vqc.nqubit
   for q in range(nq-1):
-    g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, condition=True, requires_grad=True)
+    g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, requires_grad=True)
     g.init_para([0])
     vqc.add(g)
-    g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, condition=True, requires_grad=True)
+    g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, requires_grad=True)
     g.init_para([0])
     vqc.add(g)
 

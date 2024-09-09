@@ -222,24 +222,24 @@ def amplitude_encode(amp:List[float], encode:bool=False, eps:float=1e-3, gamma:f
         if v == '0': qc.x(t)
       # mctrl-rot
       if name == 'X':
-        qc.x(q, controls=mctrl, condition=True)
+        qc.x(q, controls=mctrl)
       elif name == 'H':
         if encode:
-          qc.h(q, controls=mctrl, condition=True)
+          qc.h(q, controls=mctrl)
         else:
-          g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, condition=True, requires_grad=True)
+          g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, requires_grad=True)
           g.init_para([np.pi/2])
           qc.add(g, encode=encode)
       elif name == 'RY':
-        g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, condition=True, requires_grad=True)
+        g = dq.gate.Ry(nqubit=at.nq, wires=q, controls=mctrl, requires_grad=True)
         g.init_para([args])
         qc.add(g, encode=encode)
       elif name == 'H*':
         for qq in args:
           if encode:
-            qc.h(qq, controls=mctrl, condition=True)
+            qc.h(qq, controls=mctrl)
           else:
-            g = dq.gate.Ry(nqubit=at.nq, wires=qq, controls=mctrl, condition=True, requires_grad=True)
+            g = dq.gate.Ry(nqubit=at.nq, wires=qq, controls=mctrl, requires_grad=True)
             g.init_para([np.pi/2])
             qc.add(g, encode=encode)
       else:
