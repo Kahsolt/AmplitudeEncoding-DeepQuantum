@@ -35,9 +35,9 @@
 [当前排行榜]
 393.09  <- 假的
 361.61  <- 榜一
+?       <- 铅笔芯奇 (:O
 360.87
-358.46  <- 铅笔芯奇 (已经上360了 :O
-354.32  <- 我
+357.84  <- 我
 322.90
 ```
 
@@ -111,6 +111,33 @@ test acc: 0.935
 test gates: 253.000
 runtime: 148.048
 客观得分: 357.227
+
+[6th solution] (VQC n_layer=12 + snake + train(step=1000); mera-like [u3-enc-u3-dec]-enc-u3); +prune_pkl
+⚪ local (eps=1e-3)
+test fid: 0.916
+test acc: 0.935
+test gates: 252.888
+runtime: 141.942
+客观得分: 357.408
+⚪ local (eps=1e-2)
+test fid: 0.916
+test acc: 0.935
+test gates: 251.846
+runtime: 140.693
+客观得分: 357.546
+⚪ local (eps=1e-1)
+test fid: 0.912
+test acc: 0.935
+test gates: 241.722
+runtime: 135.361
+客观得分: 357.958
+⚪ submit (eps=1e-1)
+classifier gate count: 352
+Fidelity: 0.912
+Accuracy: 0.935
+振幅编码线路门的个数: 241.72193033664138
+运行时间: 139.57696104049683
+客观得分: 357.84134136653404 最高分数: 400
 ```
 
 得分模板

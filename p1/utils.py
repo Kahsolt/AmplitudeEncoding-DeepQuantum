@@ -135,20 +135,20 @@ def get_fidelity(state_pred:Tensor, state_true:Tensor) -> Tensor:
     #assert state_pred.shape[-1] == 1024
     state_pred = state_pred.view(-1, 1024).real
     state_true = state_true.view(-1, 1024).real
-    fidelity = torch.matmul(state_true, state_pred.T) ** 2
-    return fidelity.diag().mean()
+    fidelity = (state_pred * state_true).sum(-1)**2
+    return fidelity.mean()
 
 
+@torch.inference_mode()
 def get_acc(y_pred:Tensor, y_true:Tensor) -> Tensor:
     correct = (y_pred == y_true)
     accuracy = correct.sum() / len(correct)
     return accuracy.item()
 
 
+@torch.inference_mode()
 def cir_collate_fn(batch:List[Tuple[Tensor, int, dq.QubitCircuit]]) -> Tuple[Tensor, Tensor, Tensor]:
-    """
-    返回：(原始经典数据batch, 标签batch, 振幅编码的量子态矢量batch)
-    """
+    """ 返回：(原始经典数据batch, 标签batch, 振幅编码的量子态矢量batch) """
     xs, ys, zs = zip(*batch)
     xs = torch.stack(xs)
     ys = torch.stack(ys)
