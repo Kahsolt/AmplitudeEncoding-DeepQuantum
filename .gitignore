@@ -11,7 +11,7 @@ data/
 
 # generated
 gen/
-out/
+output/
 submit/
 
 # ref
