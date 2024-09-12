@@ -182,40 +182,82 @@ def run_test(get_vqc:Callable[[], dq.QubitCircuit], lr:float=0.01, n_repeat:int=
 
 ''' The final submit ansatz for p1(MNIST) '''
 
-def vqc_submit_p1(nq:int, n_rep:int=14):
+def vqc_submit_p1(nq:int, n_rep:int=14, init='zeros'):
   vqc = dq.QubitCircuit(nqubit=nq)
   vqc.x(0)
   for _ in range(n_rep):
     for q in range(nq-1):
-      g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, requires_grad=True)
-      g.init_para([0])
-      vqc.add(g)
-      g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, requires_grad=True)
-      g.init_para([0])
-      vqc.add(g)
+      if init == 'zeros':
+        g = dq.Ry(nqubit=nq, wires=(q+1)%nq, controls=q, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=q, controls=(q+1)%nq, requires_grad=True)
+        g.init_para([0])
+        vqc.add(g)
+      elif init == 'rand':   # 随机初始化打破对称性，不然loss可能不降
+        vqc.ry(wires=(q+1)%nq, controls=q)
+        vqc.ry(wires=q, controls=(q+1)%nq)
+      else: raise ValueError
   return vqc
 
-def vqc_submit_p1_r(nq:int, n_rep:int=14):
+def vqc_submit_p1_CRY(nq:int, n_rep:int=14):
+  '''' X - [cyclic(CRY)] '''
   vqc = dq.QubitCircuit(nqubit=nq)
-  vqc.x(wires=0)
+  vqc.x(0)
   for _ in range(n_rep):
-    for q in range(nq-1):   # 随机初始化打破对称性，不然loss可能不降
+    for q in range(nq):
       vqc.ry(wires=(q+1)%nq, controls=q)
-      vqc.ry(wires=q, controls=(q+1)%nq)
+  return vqc
+
+def vqc_submit_p1_CRY_RY(nq:int, n_rep:int=8, entgl_rule:str='linear', ladder:str='seq'):
+  '''' X - [entgl_rule(CRY) - RY] '''
+  if   entgl_rule == 'linear': offset = 1
+  elif entgl_rule == 'cyclic': offset = 0
+  else: raise ValueError
+  vqc = dq.QubitCircuit(nqubit=nq)
+  vqc.x(0)
+  for i in range(n_rep):
+    is_even = i % 2 == 0
+    if ladder == 'seq':
+      for q in range(nq-offset):
+        vqc.ry(wires=(q+1)%nq, controls=q)
+    elif ladder == 'mirror':
+      for q in (list if is_even else reversed)(range(nq-offset)):
+        vqc.ry(wires=(q+1)%nq, controls=q)
+    else: raise ValueError
+    for q in range(nq):
+      vqc.ry(wires=q)
   return vqc
 
 if not 'nq=10':
-  # gcnt=253, fid=0.86467, ts=169.015s
-  run_test(partial(vqc_submit_p1_r, 10, 14), lr=0.02, n_repeat=3, data_gen=rand_mnist)
-  # gcnt=253, fid=0.91658, ts=166.272s
-  run_test(partial(vqc_submit_p1_r, 10, 14), lr=0.02, n_repeat=3, data_gen=rand_mnist_snake_rev)
-  # gcnt=253, fid=0.93580, ts=166.227s
-  run_test(partial(vqc_submit_p1_r, 10, 14), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
-
   # gcnt=253, fid=0.61323, ts=525.098s
   run_test(partial(vqc_submit_p1, 10, 14), lr=0.02, n_repeat=10)
   # gcnt=289, fid=0.65839, ts=69.527s
   run_test(partial(vqc_submit_p1, 10, 16), lr=0.02, n_repeat=1)
+
+  # gcnt=253, fid=0.86467, ts=169.015s
+  run_test(partial(vqc_submit_p1, 10, 14, 'rand'), lr=0.02, n_repeat=3, data_gen=rand_mnist)
+  # gcnt=253, fid=0.91658, ts=166.272s
+  run_test(partial(vqc_submit_p1, 10, 14, 'rand'), lr=0.02, n_repeat=3, data_gen=rand_mnist_snake_rev)
+  # gcnt=253, fid=0.93580, ts=166.227s
+  run_test(partial(vqc_submit_p1, 10, 14, 'rand'), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+
+  # gcnt=161, fid=0.66969, ts=113.731s
+  run_test(partial(vqc_submit_p1_CRY, 10, 16), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=161, fid=0.70001, ts=116.396s
+  run_test(partial(vqc_submit_p1_CRY, 10, 16), lr=0.1, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=153, fid=0.80350, ts=85.992s
+  run_test(partial(vqc_submit_p1_CRY_RY, 10, 8, 'linear'), lr=0.1, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=153, fid=0.81822, ts=85.038s
+  run_test(partial(vqc_submit_p1_CRY_RY, 10, 8, 'linear'), lr=0.2, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=153, fid=0.78644, ts=91.076s
+  run_test(partial(vqc_submit_p1_CRY_RY, 10, 8, 'linear', 'mirror'), lr=0.1, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=161, fid=0.82088, ts=93.563s
+  run_test(partial(vqc_submit_p1_CRY_RY, 10, 8, 'cyclic'), lr=0.1, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=161, fid=0.82067, ts=91.592s
+  run_test(partial(vqc_submit_p1_CRY_RY, 10, 8, 'cyclic'), lr=0.2, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=161, fid=0.80582, ts=92.425s
+  run_test(partial(vqc_submit_p1_CRY_RY, 10, 8, 'cyclic', 'mirror'), lr=0.1, n_repeat=3, data_gen=rand_mnist_freq)
 
 
 ''' The evolutional story for vqc_F2 ansatz series '''
@@ -861,5 +903,3 @@ if not 'nq=10':
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=partial(rand_mnist_snake_rev_trim, 64))
     # gcnt=166, fid=0.77591, ts=174.973s
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=partial(rand_mnist_snake_rev_trim, 128))
-
-
