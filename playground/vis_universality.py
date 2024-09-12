@@ -317,6 +317,19 @@ def vqc_F1_all_wise_init(nq:int, n_rep:int=1):
       vqc.ry(wires=i)
   return vqc
 
+def vqc_F1_s_all_wise_init(nq:int, n_rep:int=1):
+  ''' RY(single init) - [directed-pairwise(F2) - RY] '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  vqc.ry(wires=0)   # only init wire 0
+  for _ in range(n_rep):
+    for i in range(nq):
+      for j in range(nq):
+        if i == j: continue
+        vqc.ry(wires=j, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+  return vqc
+
 def vqc_F1_HEA_wise_init(nq:int, n_rep:int=1, entgl:str='CRY', entgl_rule:str='linear'):
   ''' RY(single init) - [linear(F2) - RY] '''
   if   entgl_rule == 'linear': offset = 1
@@ -766,6 +779,9 @@ if not 'nq=9':
   # gcnt=487, fid=0.99862, ts=101.916s
   run_test(partial(vqc_F2_all_wise_init, 9, 6), lr=0.02, n_repeat=1)
 
+  # gcnt=181, fid=0.76182, ts=439.282s
+  run_test(partial(vqc_F1_all_wise_init, 9, 4), lr=0.02, n_repeat=10)
+
 if not 'nq=10':
   if 'F2/F1 标准结构，不同层数':
     # gcnt=301, fid=0.70754, ts=609.749s
@@ -887,6 +903,8 @@ if not 'nq=10':
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=rand_mnist_freq)
     # gcnt=166, fid=0.87208, ts=351.334s
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=201, fid=0.83103, ts=247.784s
+    run_test(partial(vqc_F1_s_all_wise_init, 10, 2), lr=0.02, n_repeat=5, data_gen=rand_mnist_freq)
 
     # gcnt=172, fid=0.75403, ts=172.880s
     run_test(partial(vqc_F1_HEA_wise_init, 10, 9, 'CRY', 'linear'), lr=0.02, n_repeat=5, data_gen=rand_mnist)
@@ -903,3 +921,228 @@ if not 'nq=10':
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=partial(rand_mnist_snake_rev_trim, 64))
     # gcnt=166, fid=0.77591, ts=174.973s
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=partial(rand_mnist_snake_rev_trim, 128))
+
+
+''' The Mindspore Ansatz Zoo: https://www.mindspore.cn/mindquantum/docs/zh-CN/r0.9/algorithm/mindquantum.algorithm.nisq.html '''
+
+def vqc_RY_linear(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.ry(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq-1):
+      vqc.x(wires=i+1, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+  return vqc
+
+def vqc_RY_full(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.ry(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq-1):
+      for j in range(i+1, nq):
+        vqc.x(wires=j, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+  return vqc
+
+def vqc_RY_cascade(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.ry(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq-1):
+      vqc.x(wires=i+1, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+    for i in reversed(range(nq-1)):
+      vqc.x(wires=i+1, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+  return vqc
+
+def vqc_RY_RZ_full(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.ry(wires=i)
+    vqc.rz(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq-1):
+      for j in range(i+1, nq):
+        vqc.x(wires=j, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+      vqc.rz(wires=i)
+  return vqc
+
+if not 'nq=10':
+  # gcnt=162, fid=0.26004, ts=76.253s
+  run_test(partial(vqc_RY_linear,  10, 8), lr=0.02, n_repeat=3)
+  # gcnt=175, fid=0.10327, ts=74.291s
+  run_test(partial(vqc_RY_full,    10, 3), lr=0.02, n_repeat=3)
+  # gcnt=162, fid=0.26393, ts=74.255s
+  run_test(partial(vqc_RY_cascade, 10, 4), lr=0.02, n_repeat=3)
+  # gcnt=215, fid=0.12827, ts=95.191s
+  run_test(partial(vqc_RY_RZ_full, 10, 3), lr=0.02, n_repeat=3)
+
+  # gcnt=162, fid=0.64805, ts=75.997s
+  run_test(partial(vqc_RY_linear,  10, 8), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=175, fid=0.60505, ts=74.177s
+  run_test(partial(vqc_RY_full,    10, 3), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=162, fid=0.65853, ts=75.625s
+  run_test(partial(vqc_RY_cascade, 10, 4), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+  # gcnt=215, fid=0.51854, ts=95.574s
+  run_test(partial(vqc_RY_RZ_full, 10, 3), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+
+
+''' The QAOA ansatz '''
+
+def vqc_MA_QAOA(nq:int, n_rep:int=1):
+  ''' https://arxiv.org/pdf/2302.04479 '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.h(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq-1):
+      for j in range(i+1, nq):
+        vqc.rzz(wires=[i, j])
+    for i in range(nq):
+      vqc.rx(wires=i)
+  return vqc
+
+def vqc_XQAOA(nq:int, n_rep:int=1):
+  ''' https://arxiv.org/pdf/2302.04479 '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.h(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq-1):
+      for j in range(i+1, nq):
+        vqc.rzz(wires=[i, j])
+    for i in range(nq):
+      vqc.rx(wires=i)
+      vqc.ry(wires=i)
+  return vqc
+
+if not 'nq=10':
+  # gcnt=175, fid=0.23441, ts=161.724s
+  run_test(partial(vqc_MA_QAOA, 10, 3), lr=0.02, n_repeat=5)
+  # gcnt=175, fid=0.23279, ts=163.927s
+  run_test(partial(vqc_MA_QAOA, 10, 3), lr=0.02, n_repeat=5, data_gen=rand_mnist_freq)
+
+  # gcnt=205, fid=0.30375, ts=184.506s
+  run_test(partial(vqc_XQAOA, 10, 3), lr=0.02, n_repeat=5)
+  # gcnt=205, fid=0.30028, ts=187.019s
+  run_test(partial(vqc_XQAOA, 10, 3), lr=0.02, n_repeat=5, data_gen=rand_mnist_freq)
+
+
+''' Expressivity Efficient Ansatz: https://arxiv.org/pdf/1905.10876 '''
+
+def vqc_EEA_2(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      vqc.rx(wires=i)
+      vqc.rz(wires=i)
+    for i in range(nq-1):
+      vqc.x(wires=i+1, controls=i)
+  return vqc
+
+def vqc_EEA_5(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.rx(wires=i)
+    vqc.rz(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq):
+      for j in range(nq):
+        if i == j: continue
+        vqc.rz(wires=j, controls=i)
+    for i in range(nq):
+      vqc.rx(wires=i)
+      vqc.rz(wires=i)
+  return vqc
+
+def vqc_EEA_6(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.rx(wires=i)
+    vqc.rz(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq):
+      for j in range(nq):
+        if i == j: continue
+        vqc.rx(wires=j, controls=i)
+    for i in range(nq):
+      vqc.rx(wires=i)
+      vqc.rz(wires=i)
+  return vqc
+
+def vqc_EEA_9(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    vqc.h(wires=i)
+  for _ in range(n_rep):
+    for i in range(nq-1):
+      vqc.cz(i, i+1)
+    for i in range(nq):
+      vqc.rx(wires=i)
+  return vqc
+
+def vqc_EEA_13(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      vqc.ry(wires=i)
+    for i in range(nq):
+      vqc.rz(wires=(i-1+nq)%nq, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+    for i in [0] + list(range(nq-1, 0, -1)):
+      vqc.rz(wires=(i+1)%nq, controls=i)
+  return vqc
+
+def vqc_EEA_14(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      vqc.ry(wires=i)
+    for i in range(nq):
+      vqc.rx(wires=(i-1+nq)%nq, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+    for i in [0] + list(range(nq-1, 0, -1)):
+      vqc.rx(wires=(i+1)%nq, controls=i)
+  return vqc
+
+def vqc_EEA_19(nq:int, n_rep:int=1):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      vqc.rx(wires=i)
+      vqc.rz(wires=i)
+    for i in range(nq):
+      vqc.rx(wires=i, controls=(i+1)%nq)
+  return vqc
+
+if not 'nq=10':
+  '''
+  Expressibility: 6 > 14 > 13 > 5 > 19 > 8 > 7 > 11 > 4 > 17 > 15
+  Fidelity: 6 > 14 > 13 > 5 > 2 > 9 > 19
+  '''
+  # gcnt=174, fid=0.18395, ts=88.235s
+  run_test(partial(vqc_EEA_2,  10, 6), lr=0.02, n_repeat=3)
+  # gcnt=240, fid=0.23821, ts=179.804s
+  run_test(partial(vqc_EEA_5,  10, 2), lr=0.02, n_repeat=3)
+  # gcnt=240, fid=0.36405, ts=179.811s
+  run_test(partial(vqc_EEA_6,  10, 2), lr=0.02, n_repeat=3)
+  # gcnt=162, fid=0.06655, ts=72.050s
+  run_test(partial(vqc_EEA_9,  10, 8), lr=0.02, n_repeat=3)
+  # gcnt=160, fid=0.24862, ts=106.884s
+  run_test(partial(vqc_EEA_13, 10, 4), lr=0.02, n_repeat=3)
+  # gcnt=160, fid=0.24903, ts=107.673s
+  run_test(partial(vqc_EEA_14, 10, 4), lr=0.02, n_repeat=3)
+  # gcnt=180, fid=0.02550, ts=82.862s
+  run_test(partial(vqc_EEA_19, 10, 6), lr=0.02, n_repeat=3)

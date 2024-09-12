@@ -1,5 +1,12 @@
 @ECHO OFF
 
+REM Expressibility and entangling capability of parameterized quantum circuits for hybrid quantum-classical algorithms
+wget -nc https://arxiv.org/pdf/1905.10876.pdf
+
+REM An Expressive Ansatz for Low-Depth Quantum Approximate Optimisatio
+wget -nc https://arxiv.org/pdf/2302.04479.pdf
+
+
 REM Transformation of quantum states using uniformly controlled rotations
 wget -nc https://arxiv.org/pdf/quant-ph/0407010.pdf
 

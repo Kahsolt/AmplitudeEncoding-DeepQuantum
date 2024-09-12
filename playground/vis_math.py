@@ -164,7 +164,7 @@ CSWAP = Fredkin = np.asarray([
 
 
 ''' Playground '''
-if 'xCRY':
+if not 'xCRY':
   # ↓CRY - ↑CRY (低控制高)
   xCRY = Control(RY(s('a1'))) @ (SWAP @ Control(RY(s('a0'))) @ SWAP)
   print('[xCRY]')
@@ -200,3 +200,8 @@ if not 'xRBS':
   xRBS = (SWAP @ RBS(s('a1')) @ SWAP) @ RBS(s('a0'))
   print('[xRBS]')
   print(xRBS)
+
+if not 'QAOA-gamma':  # ie. RZZ gate
+  gamma = CNOT @ np.kron(I, RZ(s('a0'))) @ CNOT
+  print('[gamma]')
+  print(gamma)

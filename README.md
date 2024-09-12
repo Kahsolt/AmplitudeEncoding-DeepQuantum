@@ -34,6 +34,9 @@ Team Name: 量子探索队
     - https://arxiv.org/abs/1904.00043
 - QAM: https://nvlabs.github.io/sionna/examples/Hello_World.html
 - Encoding techniques for Quantum Machine Learning: https://webthesis.biblio.polito.it/25437/1/tesi.pdf
+- ansatz zoo
+  - https://quantumalgorithmzoo.org/
+  - https://www.mindspore.cn/mindquantum/docs/zh-CN/r0.9/algorithm/mindquantum.algorithm.nisq.html
 
 ----
 by Armit
