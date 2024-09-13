@@ -4,15 +4,18 @@
 
 # 从注释里抽数据来画图
 
+from pathlib import Path
 from re import Match
 from re import compile as Regex
 import numpy as np
 import matplotlib.pyplot as plt
 
+BASE_PATH = Path(__file__).parent.parent
+IMG_PATH = BASE_PATH / 'img' ; IMG_PATH.mkdir(exist_ok=True)
+
 PY_FILE = './vis_universality.py'
 
 R_RECORD = Regex('gcnt\=(\d+), fid\=([\d\.]+), ts\=([\d\.]+)s')
-
 
 with open(PY_FILE, 'r', encoding='utf-8') as fh:
   lines = fh.read().strip().split('\n')
@@ -39,8 +42,12 @@ print('sc:', sc_list)
 
 point_size = 5**np.asarray(sc_list)
 
+plt.clf()
+plt.figure(figsize=(8, 8))
 plt.scatter(gcnt_list, fid_list, alpha=0.7, s=point_size)
 plt.xlabel('Gate Count')
 plt.ylabel('Fidelity')
 plt.tight_layout()
-plt.show()
+fp = IMG_PATH / 'fid-gcnt.png'
+plt.savefig(fp, dpi=400)
+print(f'savefig: {fp}')

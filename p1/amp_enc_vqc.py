@@ -101,7 +101,7 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
   # n_layer=14, n_gate=253, fid=0.9230663657188416; score=0.9230663657188416*2+(1-253/1000)=2.5931327314377
   # n_layer=13, n_gate=235, fid=0.9084532022476196; score=0.9084532022476196*2+(1-235/1000)=2.5819064044952
   # n_layer=12, n_gate=217, fid=0.8967987418174743; score=0.8967987418174743*2+(1-217/1000)=2.5765974836349
-  if 'swap-like zero init':
+  if not 'swap-like zero init':
     vqc.x(0)
     for i in range(n_layer):
       for q in range(nq-1):
@@ -329,6 +329,27 @@ def get_model(n_layer:int, nq:int=10) -> dq.QubitCircuit:
         vqc.cry(pivot + offset + 1, pivot + offset)
       vqc.rylayer(wires=[0, 1, nq-2, nq-1])
 
+  # n_layer=3, n_gate=301, fid=0.729882538318634
+  if 'vqc_F2_all_wise_init':
+    vqc.ry(wires=0)   # only init wire 0
+    for _ in range(n_layer):
+      for i in range(nq-1):   # qubit order
+        for j in range(i+1, nq):
+          vqc.ry(wires=j, controls=i)
+          vqc.ry(wires=i, controls=j)
+      for i in range(nq):
+        vqc.ry(wires=i)
+
+  # n_layer=3, n_gate=166, fid=0.7076160311698914
+  if not 'vqc_F1_all_wise_init':
+    vqc.ry(wires=0)   # only init wire 0
+    for _ in range(n_layer):
+      for i in range(nq-1):   # qubit order
+        for j in range(i+1, nq):
+          vqc.ry(wires=j, controls=i)
+      for i in range(nq):
+        vqc.ry(wires=i)
+
   return vqc
 
 
@@ -342,7 +363,7 @@ def amplitude_encode_vqc(tgt:Tensor) -> dq.QubitCircuit:
     assert count_gates(circ) == 253
     CHECK_GCNT = False
 
-  optimizer = optim.Adam(circ.parameters(), lr=0.02)
+  optimizer = optim.Adam(circ.parameters(), lr=0.2)
   for _ in range(N_ITER):
     optimizer.zero_grad()
     state = circ().swapaxes(0, 1)     # [B=1, D=1024]

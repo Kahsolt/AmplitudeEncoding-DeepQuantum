@@ -305,6 +305,29 @@ def vqc_F2_all_no_inter_RY_wise_init(nq:int, n_rep:int=1):
         vqc.ry(wires=i, controls=j)
   return vqc
 
+def vqc_exF2(nq:int, n_rep:int=1, entgl_rule:str='linear', end_RY:bool=True):
+  ''' entgl_rule(ry-cry-rcry) - (RY) '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  if   entgl_rule == 'linear': offset = 1
+  elif entgl_rule == 'cyclic': offset = 0
+  for _ in range(n_rep):
+    if entgl_rule == 'all':
+      for i in range(nq-1):
+        for j in range(i+1, nq):
+          vqc.ry(wires=i)
+          vqc.ry(wires=j, controls=i)
+          vqc.ry(wires=i, controls=j)
+    else:
+      for i in range(nq-offset):
+        j = (i+1)%nq
+        vqc.ry(wires=i)
+        vqc.ry(wires=j, controls=i)
+        vqc.ry(wires=i, controls=j)
+  if end_RY:
+    for i in range(nq):
+      vqc.ry(wires=i)
+  return vqc
+
 def vqc_F1_all_wise_init(nq:int, n_rep:int=1):
   ''' RY(single init) - [pairwise(F2) - RY] '''
   vqc = dq.QubitCircuit(nqubit=nq)
@@ -343,6 +366,27 @@ def vqc_F1_HEA_wise_init(nq:int, n_rep:int=1, entgl:str='CRY', entgl_rule:str='l
       elif entgl == 'CRX':  vqc.rx(wires=(i+1)%nq, controls=i)
       elif entgl == 'CNOT': vqc.x (wires=(i+1)%nq, controls=i)
       else: raise ValueError(entgl)
+    for i in range(nq):
+      vqc.ry(wires=i)
+  return vqc
+
+def vqc_exF1(nq:int, n_rep:int=1, entgl_rule:str='linear', end_RY:bool=True):
+  ''' entgl_rule(ry-cry) - (RY) '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  if   entgl_rule == 'linear': offset = 1
+  elif entgl_rule == 'cyclic': offset = 0
+  for _ in range(n_rep):
+    if entgl_rule == 'all':
+      for i in range(nq-1):
+        for j in range(i+1, nq):
+          vqc.ry(wires=i)
+          vqc.ry(wires=j, controls=i)
+    else:
+      for i in range(nq-offset):
+        j = (i+1)%nq
+        vqc.ry(wires=i)
+        vqc.ry(wires=j, controls=i)
+  if end_RY:
     for i in range(nq):
       vqc.ry(wires=i)
   return vqc
@@ -816,7 +860,7 @@ if not 'nq=10':
     # gcnt=496, fid=0.88548, ts=318.240s
     run_test(partial(vqc_F1_all_wise_init, 10, 9), lr=0.02, n_repeat=3)
 
-  if 'F2 变体结构':
+  if 'F2/F1 变体结构':
     # gcnt=310, fid=0.71880, ts=197.384s
     run_test(partial(vqc_F2_all, 10, 3), lr=0.02, n_repeat=3)
     # gcnt=295, fid=0.70110, ts=193.905s
@@ -850,7 +894,20 @@ if not 'nq=10':
     # gcnt=276, fid=0.61899, ts=135.262s
     run_test(partial(vqc_BS_wise_init, 10, 5), lr=0.02, n_repeat=3)
 
-  if 'F2/F1 稀疏输入':
+    # gcnt=172, fid=0.41739, ts=98.280s
+    run_test(partial(vqc_exF2, 10, 6, 'linear'), lr=0.02, n_repeat=3)
+    # gcnt=190, fid=0.49950, ts=107.652s
+    run_test(partial(vqc_exF2, 10, 6, 'cyclic'), lr=0.02, n_repeat=3)
+    # gcnt=280, fid=0.66356, ts=163.317s
+    run_test(partial(vqc_exF2, 10, 2, 'all'),    lr=0.02, n_repeat=3)
+    # gcnt=154, fid=0.40053, ts=92.381s
+    run_test(partial(vqc_exF1, 10, 8, 'linear'), lr=0.02, n_repeat=3)
+    # gcnt=170, fid=0.45917, ts=102.027s
+    run_test(partial(vqc_exF1, 10, 8, 'cyclic'), lr=0.02, n_repeat=3)
+    # gcnt=190, fid=0.49421, ts=117.244s
+    run_test(partial(vqc_exF1, 10, 2, 'all'),    lr=0.02, n_repeat=3)
+
+  if '稀疏输入':
     # gcnt=301, fid=0.70633, ts=200.103s
     run_test(partial(vqc_F2_all_wise_init, 10, 3), lr=0.02, n_repeat=3, data_gen=rand_mock_sparse_mnist)
     # gcnt=166, fid=0.52533, ts=107.391s
@@ -892,7 +949,7 @@ if not 'nq=10':
     # gcnt=166, fid=0.99999, ts=105.050s
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=3, data_gen=partial(rand_first_n, 16))
 
-  if 'F1 真MNSIT输入':
+  if '真MNSIT输入':
     # gcnt=166, fid=0.75795, ts=179.494s
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=rand_mnist)
     # gcnt=166, fid=0.77113, ts=178.002s
@@ -906,12 +963,44 @@ if not 'nq=10':
     # gcnt=201, fid=0.83103, ts=247.784s
     run_test(partial(vqc_F1_s_all_wise_init, 10, 2), lr=0.02, n_repeat=5, data_gen=rand_mnist_freq)
 
+    # gcnt=172, fid=0.84517, ts=109.191s
+    run_test(partial(vqc_exF2, 10, 6, 'linear'), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+    # gcnt=190, fid=0.85821, ts=122.588s
+    run_test(partial(vqc_exF2, 10, 6, 'cyclic'), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+    # gcnt=280, fid=0.91147, ts=176.436s
+    run_test(partial(vqc_exF2, 10, 2, 'all'),    lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+    # gcnt=154, fid=0.79679, ts=93.245s
+    run_test(partial(vqc_exF1, 10, 8, 'linear'), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+    # gcnt=170, fid=0.79948, ts=101.545s
+    run_test(partial(vqc_exF1, 10, 8, 'cyclic'), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+    # gcnt=190, fid=0.81678, ts=113.719s
+    run_test(partial(vqc_exF1, 10, 2, 'all'),    lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
+
     # gcnt=172, fid=0.75403, ts=172.880s
     run_test(partial(vqc_F1_HEA_wise_init, 10, 9, 'CRY', 'linear'), lr=0.02, n_repeat=5, data_gen=rand_mnist)
     # gcnt=172, fid=0.61785, ts=169.108s
     run_test(partial(vqc_F1_HEA_wise_init, 10, 9, 'CRX', 'linear'), lr=0.02, n_repeat=5, data_gen=rand_mnist)
     # gcnt=172, fid=0.68059, ts=119.570s
     run_test(partial(vqc_F1_HEA_wise_init, 10, 9, 'CNOT', 'linear'), lr=0.02, n_repeat=5, data_gen=rand_mnist)
+
+    # gcnt=166, fid=0.79077, ts=345.262s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.5, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.86040, ts=353.107s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.3, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.83410, ts=356.523s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.2, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.88042, ts=348.083s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.1, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.87448, ts=344.784s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.075, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.88032, ts=346.654s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.05, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.87544, ts=345.272s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.03, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.86568, ts=355.811s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.01, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.85603, ts=341.982s
+    run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.005, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
 
     # gcnt=166, fid=0.78495, ts=176.477s
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=partial(rand_mnist_snake_rev_trim, 8))
