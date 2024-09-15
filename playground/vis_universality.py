@@ -340,6 +340,25 @@ def vqc_F1_all_wise_init(nq:int, n_rep:int=1):
       vqc.ry(wires=i)
   return vqc
 
+def vqc_F1_all_wise_init_0(nq:int, n_rep:int=1):
+  ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  # only init wire 0
+  g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+  g.init_para([0.0])
+  vqc.add(g)
+  for _ in range(n_rep):
+    for i in range(nq-1):   # qubit order
+      for j in range(i+1, nq):
+        g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+        g.init_para([0.0])
+        vqc.add(g)
+    for i in range(nq):
+      g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+      g.init_para([0.0])
+      vqc.add(g)
+  return vqc
+
 def vqc_F1_s_all_wise_init(nq:int, n_rep:int=1):
   ''' RY(single init) - [directed-pairwise(F2) - RY] '''
   vqc = dq.QubitCircuit(nqubit=nq)
@@ -962,6 +981,8 @@ if not 'nq=10':
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, n_iter=1000, data_gen=rand_mnist_freq)
     # gcnt=201, fid=0.83103, ts=247.784s
     run_test(partial(vqc_F1_s_all_wise_init, 10, 2), lr=0.02, n_repeat=5, data_gen=rand_mnist_freq)
+    # gcnt=166, fid=0.45923, ts=156.974s
+    run_test(partial(vqc_F1_all_wise_init_0, 10, 3), lr=0.02, n_repeat=5, data_gen=rand_mnist_freq)
 
     # gcnt=172, fid=0.84517, ts=109.191s
     run_test(partial(vqc_exF2, 10, 6, 'linear'), lr=0.02, n_repeat=3, data_gen=rand_mnist_freq)
