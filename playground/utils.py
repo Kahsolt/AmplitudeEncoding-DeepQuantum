@@ -8,13 +8,15 @@ import torch
 import deepquantum as dq
 import numpy as np
 
+SEED = 114514
 DATA_ROOT = '../data'
 
 BASE_PATH = Path(__file__).parent
 IMG_PATH = BASE_PATH / 'img' ; IMG_PATH.mkdir(exist_ok=True)
 DATA_PATH = BASE_PATH / 'data' ; DATA_PATH.mkdir(exist_ok=True)
 
-SEED = 114514
+mean = lambda x: sum(x) / len(x)
+
 
 def set_seed():
   np.random.seed(SEED)

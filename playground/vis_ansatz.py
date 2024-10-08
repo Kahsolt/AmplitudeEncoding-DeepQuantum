@@ -14,6 +14,7 @@
 - 稀疏向量对拟合更友好
   - normalize 会导致 MNIST 不再稀疏，更难拟合
   - 稀疏值聚集而连续比随机而零散更容易拟合
+  - CIFAR10比MNSIT更容易拟合 (因为它含有大色块??!)
 - 关于拟合能力: 线路结构决定下限，门数量决定上限
 '''
 
@@ -38,10 +39,10 @@ DEBUG_LOSS = os.getenv('DEBUG_LOSS')
 
 N_ITER = 500
 N_REPEAT = 30
-mean = lambda x: sum(x) / len(x)
 
 try:
   TINY_MNIST = torch.load(DATA_PATH / 'tiny_mnist.pt')
+  TINY_CIFAR10 = torch.load(DATA_PATH / 'tiny_cifar10.pt')
   loc = np.load('../p1/img/loc.npy')
 except:
   pass
@@ -61,20 +62,8 @@ def rand_first_n(nlen:int, nq:int) -> Tensor:
   if DEBUG_INPUT: plt.plot(x.numpy()) ; plt.show()
   return x
 
-def rand_mock_sparse_mnist(nq:int) -> Tensor:
-  assert nq >= 10
-  v = torch.rand(2**nq) - 0.5
-  m = torch.zeros_like(v, dtype=torch.float32)
-  # pickle 150 random elem from the first 784 to set non-zero
-  idx = torch.randperm(784)[:150]
-  for i in idx: m[i] = 1.0
-  v *= m
-  x = v / torch.linalg.norm(v)
-  if DEBUG_INPUT: plt.plot(x.numpy()) ; plt.show()
-  return x
-
 def vec_to_state(x:Tensor, nq:int) -> Tensor:
-  # FIXME: 应该先 norm 再 pad :(
+  # FIXME: 对于恒正数据，下述两种操作顺序结果上等价；对于预先已均值-方差规范化的数据，建议此处先 norm 再 pad 以避免浮点误差 :(
   if 'legacy':
     x = F.pad(x, (0, 2**nq - len(x)), mode='constant', value=0.0)
     x_n = F.normalize(x, p=2, dim=-1)
@@ -138,8 +127,49 @@ def rand_mnist_freq(nq:int) -> Tensor:
   x = torch.tensor([x[i, j] for i, j in loc])
   return vec_to_state(x, nq)
 
+def rand_mock_sparse_mnist(nq:int) -> Tensor:
+  assert nq >= 10
+  v = torch.rand(2**nq) - 0.5
+  m = torch.zeros_like(v, dtype=torch.float32)
+  # pickle 150 random elem from the first 784 to set non-zero
+  idx = torch.randperm(784)[:150]
+  for i in idx: m[i] = 1.0
+  v *= m
+  x = v / torch.linalg.norm(v)
+  if DEBUG_INPUT: plt.plot(x.numpy()) ; plt.show()
+  return x
+
 rand_mnist_snake_rev      = lambda nq:       rand_mnist_snake(nq, rev=True)
 rand_mnist_snake_rev_trim = lambda trim, nq: rand_mnist_snake(nq, rev=True, trim=trim)
+
+def rand_cifar10(nq:int, order:str='CHW', trim:int=0) -> Tensor:
+  assert order in ['CHW', 'HWC']
+  assert nq >= 12
+  idx = torch.randint(low=0, high=len(TINY_CIFAR10), size=[1]).item()
+  x = TINY_CIFAR10[idx]
+  if trim: x[x <= trim / 255] = 0.0
+  if order == 'HWC':
+    x = x.permute((1, 2, 0))
+  x = x.flatten()
+  return vec_to_state(x, nq)
+
+def rand_cifar10_snake(nq:int, rev:bool=False, trim:int=0) -> Tensor:
+  assert nq >= 12
+  idx = torch.randint(low=0, high=len(TINY_CIFAR10), size=[1]).item()
+  x = TINY_CIFAR10[idx]  # [C, H, W]
+  if trim: x[x <= trim / 255] = 0.0
+  x = torch.stack([x[:, i, j] for i, j in snake_index_generator(x.shape[1])], dim=-1)
+  if rev: x = x.flip(-1)    # re-roder center to border
+  x = x.flatten()
+  return vec_to_state(x, nq)
+
+def rand_mock_cifar10(nq:int) -> Tensor:
+  assert nq >= 12
+  # dense vec of first 3*32*32=3072 elems
+  return rand_first_n(3072, nq)
+
+rand_cifar10_HWC       = lambda nq, trim=0: rand_cifar10      (nq, order='HWC', trim=trim)
+rand_cifar10_snake_rev = lambda nq, trim=0: rand_cifar10_snake(nq, rev=True,    trim=trim)
 
 def get_fidelity(x:Tensor, y:Tensor) -> Tensor:
   return (x * y).sum()**2
@@ -344,9 +374,8 @@ def vqc_F1_all_wise_init(nq:int, n_rep:int=1):
 def vqc_F1_all_wise_init_0(nq:int, n_rep:int=1):
   ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
   vqc = dq.QubitCircuit(nqubit=nq)
-  # only init wire 0
-  g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
-  g.init_para([0.0])
+  g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
+  g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
   vqc.add(g)
   for _ in range(n_rep):
     for i in range(nq-1):   # qubit order
@@ -356,6 +385,36 @@ def vqc_F1_all_wise_init_0(nq:int, n_rep:int=1):
         vqc.add(g)
     for i in range(nq):
       g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+      g.init_para([0.0])
+      vqc.add(g)
+  return vqc
+
+def vqc_F1_gap_order_wise_init(nq:int, n_rep:int=1):
+  ''' RY(single init) - [pairwise(F2, gap_order) - RY] '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  vqc.ry(wires=0)   # only init wire 0
+  for _ in range(n_rep):
+    for gap in range(1, nq-1):   # gap order
+      for i in range(nq-gap):
+        vqc.ry(wires=i+gap, controls=i)
+    for i in range(nq):
+      vqc.ry(wires=i)
+  return vqc
+
+def vqc_F1_gap_order_wise_init_0(nq:int, n_rep:int=1):
+  ''' RY(single init) - [pairwise(F2, gap_order) - RY], param zero init '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  g = dq.Ry(wires=0, nqubit=nq, requires_grad=True)   # only init wire 0
+  g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+  vqc.add(g)
+  for _ in range(n_rep):
+    for gap in range(1, nq-1):   # gap order
+      for i in range(nq-gap):
+        g = dq.Ry(wires=i+gap, controls=i, nqubit=nq, requires_grad=True)
+        g.init_para([0.0])
+        vqc.add(g)
+    for i in range(nq):
+      g = dq.Ry(wires=i, nqubit=nq, requires_grad=True)
       g.init_para([0.0])
       vqc.add(g)
   return vqc
@@ -1032,6 +1091,44 @@ if not 'nq=10':
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=partial(rand_mnist_snake_rev_trim, 64))
     # gcnt=166, fid=0.77591, ts=174.973s
     run_test(partial(vqc_F1_all_wise_init, 10, 3), lr=0.02, n_repeat=5, data_gen=partial(rand_mnist_snake_rev_trim, 128))
+
+if not 'nq=12':
+  if '真CIFAR10输入':
+    # gcnt=79, fid=0.83038, ts=87.078s; score~=2.58176
+    run_test(partial(vqc_F1_all_wise_init, 12, 1), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
+    # gcnt=157, fid=0.92497, ts=169.481s; score~=2.69294
+    run_test(partial(vqc_F1_all_wise_init, 12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
+    # gcnt=235, fid=0.93357, ts=256.822s; score~=2.63214
+    run_test(partial(vqc_F1_all_wise_init, 12, 3), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
+
+    # gcnt=157, fid=0.96159, ts=169.883s; score~=2.76618 (⭐)
+    run_test(partial(vqc_F1_all_wise_init_0,       12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
+    # gcnt=155, fid=0.94067, ts=172.713s; score~=2.72634
+    run_test(partial(vqc_F1_gap_order_wise_init,   12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
+    # gcnt=155, fid=0.95962, ts=175.082s; score~=2.76424
+    run_test(partial(vqc_F1_gap_order_wise_init_0, 12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
+
+    # gcnt=79, fid=0.76987, ts=86.685s
+    run_test(partial(vqc_F1_all_wise_init, 12, 1), lr=0.02, n_repeat=5, data_gen=rand_cifar10_HWC)
+    # gcnt=157, fid=0.88757, ts=175.101s
+    run_test(partial(vqc_F1_all_wise_init, 12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10_HWC)
+    # gcnt=235, fid=0.89124, ts=259.387s
+    run_test(partial(vqc_F1_all_wise_init, 12, 3), lr=0.02, n_repeat=5, data_gen=rand_cifar10_HWC)
+
+    # gcnt=79, fid=0.80797, ts=88.516s
+    run_test(partial(vqc_F1_all_wise_init, 12, 1), lr=0.02, n_repeat=5, data_gen=rand_cifar10_snake_rev)
+    # gcnt=157, fid=0.87726, ts=172.158s
+    run_test(partial(vqc_F1_all_wise_init, 12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10_snake_rev)
+    # gcnt=235, fid=0.88875, ts=255.159s
+    run_test(partial(vqc_F1_all_wise_init, 12, 3), lr=0.02, n_repeat=5, data_gen=rand_cifar10_snake_rev)
+
+  if '随机稠密输入':
+    # gcnt=79, fid=0.07442, ts=84.774s
+    run_test(partial(vqc_F1_all_wise_init, 12, 1), lr=0.02, n_repeat=5, data_gen=rand_mock_cifar10)
+    # gcnt=157, fid=0.15322, ts=173.066s
+    run_test(partial(vqc_F1_all_wise_init, 12, 2), lr=0.02, n_repeat=5, data_gen=rand_mock_cifar10)
+    # gcnt=235, fid=0.22628, ts=257.779s
+    run_test(partial(vqc_F1_all_wise_init, 12, 3), lr=0.02, n_repeat=5, data_gen=rand_mock_cifar10)
 
 
 ''' The Mindspore Ansatz Zoo: https://www.mindspore.cn/mindquantum/docs/zh-CN/r0.9/algorithm/mindquantum.algorithm.nisq.html '''
