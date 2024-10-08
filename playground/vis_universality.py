@@ -1256,3 +1256,91 @@ if not 'nq=10':
   run_test(partial(vqc_EEA_14, 10, 4), lr=0.02, n_repeat=3)
   # gcnt=180, fid=0.02550, ts=82.862s
   run_test(partial(vqc_EEA_19, 10, 6), lr=0.02, n_repeat=3)
+
+
+''' RY-cyclic(CZ) from QGAN: https://arxiv.org/pdf/1904.00043 '''
+
+def vqc_RY_cyclic_CZ(nq:int, n_rep:int=10):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      vqc.ry(i)
+    for i in range(nq):
+      vqc.cz((i+1)%nq, i)
+  for i in range(nq):
+    vqc.ry(i)
+  return vqc
+
+if not 'nq=6':
+  # gcnt=78, fid=0.62437, ts=44.150s
+  run_test(partial(vqc_RY_cyclic_CZ, 6, 6), lr=0.02, n_repeat=5)
+
+if not 'nq=10':
+  # gcnt=170, fid=0.17342, ts=60.000s
+  run_test(partial(vqc_RY_cyclic_CZ, 10,  8), lr=0.02, n_repeat=3)
+  # gcnt=210, fid=0.16999, ts=73.361s
+  run_test(partial(vqc_RY_cyclic_CZ, 10, 10), lr=0.02, n_repeat=3)
+  # gcnt=250, fid=0.16384, ts=86.240s
+  run_test(partial(vqc_RY_cyclic_CZ, 10, 12), lr=0.02, n_repeat=3)
+  # gcnt=330, fid=0.16255, ts=114.043s
+  run_test(partial(vqc_RY_cyclic_CZ, 10, 16), lr=0.02, n_repeat=3)
+
+
+''' RY-adjacent(CNOT) from https://arxiv.org/pdf/2103.13211 '''
+
+def vqc_RY_adjacent_CNOT(nq:int, n_rep:int=10):
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      vqc.ry(i)
+    for i in range(0, nq-1, 2):
+      vqc.cnot(i+1, i)
+    for i in range(1, nq, 2):
+      vqc.cnot((i+1)%nq, i)
+  for i in range(nq):
+    vqc.ry(i)
+  return vqc
+
+if not 'nq=10':
+  # gcnt=170, fid=0.27346, ts=48.144s
+  run_test(partial(vqc_RY_adjacent_CNOT, 10,  8), lr=0.02, n_repeat=3)
+  # gcnt=210, fid=0.33862, ts=57.630s
+  run_test(partial(vqc_RY_adjacent_CNOT, 10, 10), lr=0.02, n_repeat=3)
+  # gcnt=250, fid=0.37947, ts=66.279s
+  run_test(partial(vqc_RY_adjacent_CNOT, 10, 12), lr=0.02, n_repeat=3)
+  # gcnt=330, fid=0.47512, ts=87.080s
+  run_test(partial(vqc_RY_adjacent_CNOT, 10, 16), lr=0.02, n_repeat=3)
+
+
+''' RX/RY/RZ-adjacent(CNOT) from https://arxiv.org/pdf/2103.13211 '''
+
+def vqc_Rrnd_adjacent_CNOT(nq:int, n_rep:int=10):
+  import random
+  rand = lambda: random.randrange(3)
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      r = rand()
+      if   r == 0: vqc.rx(i)
+      elif r == 1: vqc.ry(i)
+      elif r == 2: vqc.rz(i)
+    for i in range(0, nq-1, 2):
+      vqc.cnot(i+1, i)
+    for i in range(1, nq, 2):
+      vqc.cnot((i+1)%nq, i)
+  for i in range(nq):
+    r = rand()
+    if   r == 0: vqc.rx(i)
+    elif r == 1: vqc.ry(i)
+    elif r == 2: vqc.rz(i)
+  return vqc
+
+if not 'nq=10':
+  # gcnt=170, fid=0.13739, ts=47.712s
+  run_test(partial(vqc_Rrnd_adjacent_CNOT, 10,  8), lr=0.02, n_repeat=3)
+  # gcnt=210, fid=0.17433, ts=59.170s
+  run_test(partial(vqc_Rrnd_adjacent_CNOT, 10, 10), lr=0.02, n_repeat=3)
+  # gcnt=250, fid=0.19957, ts=69.347s
+  run_test(partial(vqc_Rrnd_adjacent_CNOT, 10, 12), lr=0.02, n_repeat=3)
+  # gcnt=330, fid=0.26883, ts=92.022s
+  run_test(partial(vqc_Rrnd_adjacent_CNOT, 10, 16), lr=0.02, n_repeat=3)

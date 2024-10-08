@@ -6,6 +6,10 @@ __pycache__/
 thesis/*
 !thesis/*.cmd
 
+# repo
+repo/*
+!repo/*.cmd
+
 # data
 data/
 
