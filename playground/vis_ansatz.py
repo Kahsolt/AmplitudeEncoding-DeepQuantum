@@ -31,23 +31,21 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
+from utils import *
+
 DEBUG_INPUT = os.getenv('DEBUG_INPUT')
 DEBUG_LOSS = os.getenv('DEBUG_LOSS')
 
 N_ITER = 500
 N_REPEAT = 30
-SEED = 114514
 mean = lambda x: sum(x) / len(x)
 
 try:
-  TINY_MNIST = torch.load('./tiny_mnist.pt')
+  TINY_MNIST = torch.load(DATA_PATH / 'tiny_mnist.pt')
   loc = np.load('../p1/img/loc.npy')
 except:
   pass
 
-def set_seed():
-  torch.manual_seed(SEED)
-  torch.cuda.manual_seed_all(SEED)
 
 def rand_state(nq:int) -> Tensor:
   v = torch.rand(2**nq) - 0.5
@@ -77,14 +75,20 @@ def rand_mock_sparse_mnist(nq:int) -> Tensor:
 
 def vec_to_state(x:Tensor, nq:int) -> Tensor:
   # FIXME: 应该先 norm 再 pad :(
-  x = F.pad(x, (0, 2**nq - len(x)), mode='constant', value=0.0)
-  x_n = F.normalize(x, p=2, dim=-1)
+  if 'legacy':
+    x = F.pad(x, (0, 2**nq - len(x)), mode='constant', value=0.0)
+    x_n = F.normalize(x, p=2, dim=-1)
+    x_o = x_n
+  else:
+    x_n = F.normalize(x, p=2, dim=-1)
+    x = F.pad(x_n, (0, 2**nq - len(x_n)), mode='constant', value=0.0)
+    x_o = x
   if DEBUG_INPUT:
     plt.clf()
     plt.plot(x  .flatten().numpy())
     plt.plot(x_n.flatten().numpy())
     plt.show()
-  return x_n
+  return x_o
 
 def rand_mnist(nq:int, trim:int=0) -> Tensor:
   assert nq >= 10
@@ -139,9 +143,6 @@ rand_mnist_snake_rev_trim = lambda trim, nq: rand_mnist_snake(nq, rev=True, trim
 
 def get_fidelity(x:Tensor, y:Tensor) -> Tensor:
   return (x * y).sum()**2
-
-def get_gate_count(qc:dq.QubitCircuit) -> int:
-  return len([op for op in qc.operators.modules() if isinstance(op, dq.operation.Operation)])
 
 def run_test(get_vqc:Callable[[], dq.QubitCircuit], lr:float=0.01, n_repeat:int=N_REPEAT, n_iter:int=N_ITER, data_gen:Callable=rand_state) -> Tuple[float, float]:
   set_seed()

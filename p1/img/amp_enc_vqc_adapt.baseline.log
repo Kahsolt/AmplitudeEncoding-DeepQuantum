@@ -1,0 +1,54 @@
+[Start Time] 2024-07-27 17:00:47.939378
+[init_circ] gate count: 253
+  fid_score: 0.8844494819641113
+  gcnt_score: 0.747
+[0] >> Score: 2.5158989639282225 (time: 112.11506247520447)
+
+[init_circ] gate count: 253
+  fid_score: 0.9360393285751343
+  gcnt_score: 0.747
+[1] >> Score: 2.6190786571502684 (time: 119.51648688316345)
+
+[init_circ] gate count: 253
+  fid_score: 0.8967252969741821
+  gcnt_score: 0.747
+[2] >> Score: 2.540450593948364 (time: 116.8995053768158)
+
+[init_circ] gate count: 253
+  fid_score: 0.9076168537139893
+  gcnt_score: 0.747
+[3] >> Score: 2.5622337074279784 (time: 115.19998216629028)
+
+[init_circ] gate count: 253
+  fid_score: 0.9195213913917542
+  gcnt_score: 0.747
+[4] >> Score: 2.586042782783508 (time: 113.37158823013306)
+
+[init_circ] gate count: 253
+  fid_score: 0.9205753207206726
+  gcnt_score: 0.747
+[5] >> Score: 2.588150641441345 (time: 114.76687479019165)
+
+[init_circ] gate count: 253
+  fid_score: 0.914801836013794
+  gcnt_score: 0.747
+[6] >> Score: 2.5766036720275878 (time: 114.78527736663818)
+
+[init_circ] gate count: 253
+  fid_score: 0.9188804626464844
+  gcnt_score: 0.747
+[7] >> Score: 2.5847609252929686 (time: 114.77803039550781)
+
+[init_circ] gate count: 253
+  fid_score: 0.9349375367164612
+  gcnt_score: 0.747
+[8] >> Score: 2.6168750734329222 (time: 114.9716808795929)
+
+[init_circ] gate count: 253
+  fid_score: 0.9093416929244995
+  gcnt_score: 0.747
+[9] >> Score: 2.565683385848999 (time: 114.69461226463318)
+
+------------------------------------------
+mean(score): 2.5755778403282164
+[Finish Time] 2024-07-27 17:19:59.564259

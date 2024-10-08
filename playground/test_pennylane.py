@@ -8,7 +8,7 @@ import pennylane as qml
 import pennylane.templates as T
 from pennylane.tape import QuantumTape
 
-from utils import QMNISTDatasetIdea
+from p1.utils import QMNISTDatasetIdea
 
 T.state_preparations.MottonenStatePreparation
 T.state_preparations.ArbitraryStatePreparation

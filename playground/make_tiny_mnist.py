@@ -7,14 +7,12 @@ import torch
 from torchvision.datasets import MNIST
 import torchvision.transforms as T
 
-DATA_ROOT = '../data'
+from utils import *
+
 Y_LABELS = [0, 1, 2, 3, 4]
 N_SAMPLE_PER_CLS = 100
 
-SEED = 114514
-random.seed(SEED)
-torch.manual_seed(SEED)
-
+set_seed()
 
 transform = T.Compose([
   T.ToTensor(),
@@ -36,7 +34,7 @@ print(' max:',   X.max())
 print(' min:',   X.min())
 print(' mean:',  X.mean())
 print(' std:',   X.std())
-torch.save(X, './tiny_mnist.pt')
+torch.save(X, DATA_PATH / 'tiny_mnist.pt')
 
 
 transform_n = T.Compose([
@@ -60,4 +58,4 @@ print(' max:',   X_n.max())
 print(' min:',   X_n.min())
 print(' mean:',  X_n.mean())
 print(' std:',   X_n.std())
-torch.save(X_n, './tiny_mnist_n.pt')
+torch.save(X_n, DATA_PATH / 'tiny_mnist_n.pt')

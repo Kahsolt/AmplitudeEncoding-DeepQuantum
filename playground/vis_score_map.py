@@ -2,15 +2,13 @@
 # Author: Armit
 # Create Time: 2024/09/13 
 
-# 查看分数等高线
+# 查看评分公式设定的分数等高线
 
-from pathlib import Path
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-BASE_PATH = Path(__file__).parent.parent
-IMG_PATH = BASE_PATH / 'img' ; IMG_PATH.mkdir(exist_ok=True)
+from utils import IMG_PATH
 
 
 def get_score(fid:float, gcnt:int) -> float:

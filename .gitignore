@@ -13,17 +13,15 @@ repo/*
 # data
 data/
 
-# generated
-gen/
-output/
-submit/
-
 # ref
 ref/
 
-# logs
-log/
-*.log
+# generated
+output/
+submit/
+
+# lprof
+*.lprof
 
 # team info
 TEAM.md

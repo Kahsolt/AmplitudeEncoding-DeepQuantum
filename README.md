@@ -12,11 +12,16 @@ Team Name: 量子探索队
 
 ⚪ install
 
-- `conda create -n q python==3.8`
+- `conda create -n q python==3.10`
 - `conda activare q`
-- install [PyTorch](https://pytorch.org/get-started/locally/)
-  - only need `torch` and `torchvision`
-- `pip install -r requirements.txt`
+- install [PyTorch](https://pytorch.org/get-started/locally/), only need `torch` and `torchvision`
+- `pip install deepquantum`
+
+⚪ run (see each sub-project ;))
+
+- [p1](./p1): amp_enc & clf for MNIST
+- [p2](./p2): amp_enc & clf for CIFAR10
+- [playground](./playground): free playground for research 🎉
 
 
 #### refenrence

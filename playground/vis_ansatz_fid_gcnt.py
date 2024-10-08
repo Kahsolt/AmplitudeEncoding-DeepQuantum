@@ -2,18 +2,16 @@
 # Author: Armit
 # Create Time: 2024/09/10 
 
-# 从注释里抽数据来画图
+# 从 vis_ansatz.py 的注释里抽数据来画图
 
-from pathlib import Path
 from re import Match
 from re import compile as Regex
 import numpy as np
 import matplotlib.pyplot as plt
 
-BASE_PATH = Path(__file__).parent.parent
-IMG_PATH = BASE_PATH / 'img' ; IMG_PATH.mkdir(exist_ok=True)
+from utils import IMG_PATH
 
-PY_FILE = './vis_universality.py'
+PY_FILE = './vis_ansatz.py'
 
 R_RECORD = Regex('gcnt\=(\d+), fid\=([\d\.]+), ts\=([\d\.]+)s')
 

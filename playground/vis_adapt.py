@@ -4,12 +4,13 @@
 
 # 探究单门级别的 ADAPT 线路构造在真实稀疏MNIST上能省多少个门
 # 以 vqc_F1_all_wise_init (gcnt=166) + rand_mnist_freq + n_iter=500 为基准
+# NOTE: 结论是保真度根本不行！！
 
 import pickle as pkl
 from argparse import ArgumentParser
 from typing import List
 
-from vis_universality import *
+from vis_ansatz import *
 
 nq = 10   # FIXME: magic
 

@@ -2,7 +2,7 @@
 # Author: Armit
 # Create Time: 2024/09/10 
 
-# 查看线路的数学结构
+# 查看线路对应的数学矩阵结构
 
 import sympy as sp
 from sympy import Symbol as s

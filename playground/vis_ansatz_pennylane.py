@@ -6,7 +6,7 @@
 # - 结论是 pennylane 比 deepquantum 还慢，并且 fid 没有提升
 
 from typing import Union
-from vis_universality import *
+from vis_ansatz import *
 
 import os
 os.environ['OMP_NUM_THREADS'] = '4'
@@ -15,16 +15,14 @@ from pennylane import numpy as np   # 使用 hijack 过的 numpy
 from pennylane.numpy import ndarray
 from pennylane.optimize import AdamOptimizer
 
+from utils import *
+
 DEVICE = 'default.qubit'    # 'lightning.qubit'
 INTERFACE = 'autograd'      # ['autograd', 'torch']
 DIFF_METHOD = 'best'        # ['best', 'backprop', 'adjoint', 'parameter-shift', 'finite-diff']
 
 Data = Union[ndarray, Tensor]
 
-def set_seed():
-  np.random.seed(SEED)
-  torch.manual_seed(SEED)
-  torch.cuda.manual_seed_all(SEED)
 
 def get_fidelity(x:Data, y:Data, keep_grad:bool=False) -> Data:
   fid = (x * y).sum()**2
