@@ -1,0 +1,5 @@
+pennylane
+pyqpanda
+sympy
+matplotlib
+seaborn
