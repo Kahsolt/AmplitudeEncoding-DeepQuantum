@@ -1,8 +1,10 @@
 import os
+import sys
 import random
 import pickle
 import multiprocessing
 from functools import partial
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -24,6 +26,11 @@ torch.cuda.manual_seed_all(SEED)
 # 确定性操作
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+
+if os.getenv('MY_LABORATORY') or sys.platform == 'win32':
+    DATA_PATH = '../data'
+else:
+    DATA_PATH = '/data'
 
 
 def count_gates(cir:dq.QubitCircuit):
@@ -54,10 +61,10 @@ def reshape_norm_padding(x):
 
 def get_fidelity(state_pred, state_true):
     # state_pred, state_true: (batch_size, 4096, 1)
-    state_pred = state_pred.view(-1, 4096)
-    state_true = state_true.view(-1, 4096)
-    fidelity = torch.abs(torch.matmul(state_true.conj(), state_pred.T)) ** 2
-    return fidelity.diag().mean()
+    state_pred = state_pred.view(-1, 4096).real
+    state_true = state_true.view(-1, 4096).real
+    fidelity = (state_pred * state_true).sum(-1)**2
+    return fidelity.mean()
 
 
 def get_acc(y_pred, y_true):
@@ -68,22 +75,32 @@ def get_acc(y_pred, y_true):
 
 
 # 将数据的平均值调整为接近0 大部分像素值会落在[-1, 1]范围内
+# https://blog.csdn.net/weixin_44579633/article/details/123128976
+# https://github.com/kuangliu/pytorch-cifar/issues/8
+# https://github.com/kuangliu/pytorch-cifar/issues/16
+# https://github.com/kuangliu/pytorch-cifar/issues/19
+# https://github.com/Armour/pytorch-nn-practice/blob/master/utils/meanstd.py
 cifar10_transforms = T.Compose([
     T.ToTensor(),
-    T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    # this is wrong!
+    #T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # use this instead :)
+    #T.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+    # This is 5-class stats on trainset
+    T.Normalize((0.4903, 0.4873, 0.4642), (0.2519, 0.2498, 0.2657)),
 ])
 
 
 class CIFAR10Dataset(Dataset):
 
-    def __init__(self, train:bool = True, size:int = 100000000):
+    def __init__(self, train:bool = True, size:int = 100000000, transform=cifar10_transforms):
         """
         随机选择5个类构造CIFAR10数据集；测试集每个类仅随机抽选100个测试样本。
         Args:
             train (bool): 是否加载训练数据集，如果为 False，则加载测试数据集。默认为 True。
             size (int): 数据集的大小。
         """
-        self.dataset = CIFAR10(root='/data', train=train, download=True, transform=cifar10_transforms)
+        self.dataset = CIFAR10(root=DATA_PATH, train=train, download=True, transform=transform)
         self.class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
         
         # 随机选择5个类别
@@ -173,26 +190,42 @@ class PerfectAmplitudeEncodingDataset(Dataset):
 
 # 注意: 决赛的数据集名字必须固定为 QCIFAR10Dataset
 # todo: 构建振幅编码线路
+is_show_gate_count = True
 def encode_single_data(data, num_qubits=12, num_layers=10):
-    image, label = data
+    global is_show_gate_count
+    image, label = data     # [3, 32, 32], []
     
     # 构建振幅编码线路
     encoding_circuit = dq.QubitCircuit(num_qubits)
-    encoding_circuit.rylayer(encode=True)
+    #encoding_circuit.rylayer(encode=True)
+    encoding_circuit.rylayer()
     for _ in range(num_layers):
         encoding_circuit.rylayer()
+    #encoding_circuit.encode([image.mean()]*num_qubits)  # fix params of the 1st RY layer (why?)
     # Count gates before encoding
     gate_count = count_gates(encoding_circuit)
-    encoding_circuit.encode([image.mean()]*num_qubits)
-    
+    if is_show_gate_count:
+        is_show_gate_count = False
+        print('gate_count:', gate_count)    # 1212
+
     # 优化参数，使得线路能够制备出|x>
+    target = reshape_norm_padding(image)
     optimizer = torch.optim.Adam(encoding_circuit.parameters(), lr=0.01)
-    for _ in range(200):
-        state = encoding_circuit()
-        loss = 1 - get_fidelity(state.unsqueeze(0), reshape_norm_padding(image))
+    pbar = tqdm(range(25))
+    loss_list = []
+    for _ in range(25):
+        state = encoding_circuit().unsqueeze(0)
+        loss = -get_fidelity(state, target)
+        #loss_list.append(loss.item())
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        #pbar.set_description(f'loss: {loss.item()}')
+    if not 'plot':
+        import matplotlib.pyplot as plt
+        plt.plot(loss_list)
+        plt.show()
+    print('fid:', -loss.item())
 
     # Detach the state tensor before returning
     return (image, label, encoding_circuit().detach(), gate_count)
@@ -210,16 +243,23 @@ class QCIFAR10Dataset(Dataset):
         self.dataset = CIFAR10Dataset(train=train, size=size)
         self.num_total_gates = 0
         self.quantum_dataset = self.encode_data()
+        #self.quantum_dataset = self.encode_data_single_thread()
         del self.dataset
 
-    def encode_data(self):
+    def encode_data_single_thread(self, num_layers:int=100):
+        results = [encode_single_data(it, num_qubits=12, num_layers=num_layers) for it in self.dataset]
+        quantum_dataset = [(image, label, state_vector) for image, label, state_vector, _ in results]
+        self.num_total_gates = sum(gate_count for _, _, _, gate_count in results)
+        return quantum_dataset
+
+    def encode_data(self, num_layers:int=100):
         """
         返回: a list of tuples (原始经典数据, 标签, 振幅编码量子线路的输出)=(image, label, state_vector)
         """
-        num_cores = 20  # todo: 修改为合适的配置
+        num_cores = 8  # todo: 修改为合适的配置
         pool = multiprocessing.Pool(num_cores)
         # Create a partial function with fixed parameters
-        encode_func = partial(encode_single_data, num_qubits=12, num_layers=100)
+        encode_func = partial(encode_single_data, num_qubits=12, num_layers=num_layers)
         # Use tqdm to show progress
         results = list(tqdm(pool.imap(encode_func, self.dataset), total=len(self.dataset)))
         pool.close()
@@ -250,6 +290,6 @@ if __name__ == '__main__':
     # 确保目录存在
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     test_dataset = QCIFAR10Dataset(train=False) 
-    print('dataset labels', [sample[1].item() for sample in test_dataset])
+    print('dataset labels:', Counter(sample[1].item() for sample in test_dataset))
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'wb') as file:
         pickle.dump(test_dataset, file)

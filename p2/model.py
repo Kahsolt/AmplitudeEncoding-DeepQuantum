@@ -1,5 +1,6 @@
 import os
 import random
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -71,7 +72,7 @@ if __name__ == '__main__':
     # dataset = QCIFAR10Dataset(train=True, size=20) 
     # dataset = QCIFAR10Dataset(train=False, size=20) 
     dataset = PerfectAmplitudeEncodingDataset(train=True)
-    print('dataset labels:', [sample[1].item() for sample in dataset])
+    print('dataset labels:', Counter(sample[1].item() for sample in dataset))
     print('gates_count:', dataset.get_gates_count())
 
     data_loader = DataLoader(dataset, batch_size=128, shuffle=True)

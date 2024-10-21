@@ -78,12 +78,17 @@ def validate_test_dataset(test_dataset):
 if __name__ == '__main__':
     DEVICE = "cuda:0"
     OUTPUT_DIR = "output"
-    BATCH_SIZE = 128    # todo: 修改为合适的配置
+    BATCH_SIZE = 64    # todo: 修改为合适的配置
 
+    t0 = time.time()
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
         test_dataset = pickle.load(file)
-
+    t1 = time.time()
+    print(f'>> load pickle done ({t1 - t0:.3f}s)')
+    t0 = time.time()
     is_valid = validate_test_dataset(test_dataset)
+    t1 = time.time()
+    print(f'>> check dataset done ({t1 - t0:.3f}s)')
     if not is_valid:
         raise RuntimeError('test_dataset is not valid')
 
