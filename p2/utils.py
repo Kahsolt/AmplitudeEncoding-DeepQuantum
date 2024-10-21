@@ -2,6 +2,7 @@ import os
 import sys
 import random
 import pickle
+from time import time
 import multiprocessing
 from functools import partial
 from collections import Counter
@@ -87,7 +88,7 @@ cifar10_transforms = T.Compose([
     # use this instead :)
     #T.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     # This is 5-class stats on trainset
-    T.Normalize((0.4903, 0.4873, 0.4642), (0.2519, 0.2498, 0.2657)),
+    #T.Normalize((0.4903, 0.4873, 0.4642), (0.2519, 0.2498, 0.2657)),
 ])
 
 
@@ -191,36 +192,63 @@ class PerfectAmplitudeEncodingDataset(Dataset):
 # 注意: 决赛的数据集名字必须固定为 QCIFAR10Dataset
 # todo: 构建振幅编码线路
 is_show_gate_count = True
-def encode_single_data(data, num_qubits=12, num_layers=10):
+def encode_single_data(data):
     global is_show_gate_count
     image, label = data     # [3, 32, 32], []
-    
-    # 构建振幅编码线路
-    encoding_circuit = dq.QubitCircuit(num_qubits)
-    #encoding_circuit.rylayer(encode=True)
-    encoding_circuit.rylayer()
-    for _ in range(num_layers):
-        encoding_circuit.rylayer()
-    #encoding_circuit.encode([image.mean()]*num_qubits)  # fix params of the 1st RY layer (why?)
-    # Count gates before encoding
+
+    # [n_rep=14] fid=0.942, gcnt=337, timecost=1272s
+    def vqc_submit_p1_modify(nq:int, n_rep:int=14):
+        vqc = dq.QubitCircuit(nqubit=nq)
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+        g.init_para([np.pi])
+        vqc.add(g)
+        for _ in range(n_rep):
+            for q in range(nq):
+                vqc.ry(wires=(q+1)%nq, controls=q)
+                vqc.ry(wires=q, controls=(q+1)%nq)
+        return vqc
+
+    # [n_rep=1] fid=0.930, gcnt=79, timecost=1324s; n_iter=500
+    # [n_rep=2] fid=0.954, gcnt=157, timecost=620s; n_iter=100
+    # [n_rep=3] fid=0.965, gcnt=235, timecost=836s; n_iter=100
+    def vqc_F1_all_wise_init_0(nq:int=12, n_rep:int=2):
+        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
+        g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+        vqc.add(g)
+        for _ in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                for j in range(i+1, nq):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
+        return vqc
+
+    #encoding_circuit = vqc_submit_p1_modify(12, 14)
+    encoding_circuit = vqc_F1_all_wise_init_0(12, 1)
+    #encoding_circuit = vqc_F1_all_wise_init_0(12, 2)
+    #encoding_circuit = vqc_F1_all_wise_init_0(12, 3)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
         is_show_gate_count = False
-        print('gate_count:', gate_count)    # 1212
+        print('gate_count:', gate_count)    # 157
 
     # 优化参数，使得线路能够制备出|x>
     target = reshape_norm_padding(image)
-    optimizer = torch.optim.Adam(encoding_circuit.parameters(), lr=0.01)
-    pbar = tqdm(range(25))
+    optimizer = torch.optim.Adam(encoding_circuit.parameters(), lr=0.1)
     loss_list = []
-    for _ in range(25):
+    for _ in range(100):
         state = encoding_circuit().unsqueeze(0)
         loss = -get_fidelity(state, target)
-        #loss_list.append(loss.item())
+        loss_list.append(loss.item())
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        #pbar.set_description(f'loss: {loss.item()}')
     if not 'plot':
         import matplotlib.pyplot as plt
         plt.plot(loss_list)
@@ -242,26 +270,26 @@ class QCIFAR10Dataset(Dataset):
         """
         self.dataset = CIFAR10Dataset(train=train, size=size)
         self.num_total_gates = 0
+        ts_start = time()
         self.quantum_dataset = self.encode_data()
         #self.quantum_dataset = self.encode_data_single_thread()
+        ts_end = time()
+        print('>> amp_enc_vqc time cost:', ts_end - ts_start)
         del self.dataset
 
-    def encode_data_single_thread(self, num_layers:int=100):
-        results = [encode_single_data(it, num_qubits=12, num_layers=num_layers) for it in self.dataset]
+    def encode_data_single_thread(self):
+        results = [encode_single_data(it) for it in self.dataset]
         quantum_dataset = [(image, label, state_vector) for image, label, state_vector, _ in results]
         self.num_total_gates = sum(gate_count for _, _, _, gate_count in results)
         return quantum_dataset
 
-    def encode_data(self, num_layers:int=100):
+    def encode_data(self):
         """
         返回: a list of tuples (原始经典数据, 标签, 振幅编码量子线路的输出)=(image, label, state_vector)
         """
         num_cores = 8  # todo: 修改为合适的配置
         pool = multiprocessing.Pool(num_cores)
-        # Create a partial function with fixed parameters
-        encode_func = partial(encode_single_data, num_qubits=12, num_layers=num_layers)
-        # Use tqdm to show progress
-        results = list(tqdm(pool.imap(encode_func, self.dataset), total=len(self.dataset)))
+        results = list(tqdm(pool.imap(encode_single_data, self.dataset), total=len(self.dataset)))
         pool.close()
         pool.join()
 

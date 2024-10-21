@@ -4,6 +4,7 @@ import shutil
 import glob
 import pickle
 import random
+from time import time
 from collections import Counter
 
 import torch
@@ -58,10 +59,12 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
     for file in source_code_files:
         shutil.copy(file, output_src_dir)
 
-    save_path = os.path.join(output_dir, f"best_model.pt")
-    history_path = os.path.join(output_dir, f"loss_history.json")
+    save_path = os.path.join(output_dir, "best_model.pt")
+    save_acc_path = os.path.join(output_dir, "best_model.acc.pt")
+    history_path = os.path.join(output_dir, "loss_history.json")
     pbar = tqdm(total=num_epochs * len(train_loader), position=0, leave=True)
     best_valid_loss = float('inf')
+    best_valid_acc = 0.0
     history = {
         'train_loss': [], 
         'valid_loss': [],
@@ -86,7 +89,7 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
             optimizer.step()
             train_loss += loss.item() * y.size(0)
             train_acc += (output.argmax(-1) == y).sum().item()
-            inner_pbar.set_description(f'Batch Loss: {loss.item():.4f} | Grad Norm: {total_norm:.2f}')
+            inner_pbar.set_description(f'Batch Loss: {loss.item():.4f} | Grad Norm: {total_norm:.4f}')
             pbar.update(1)
         train_loss /= len(train_loader.dataset)
         train_acc /= len(train_loader.dataset)
@@ -114,8 +117,15 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
         with open(history_path, 'w', encoding='utf-8') as fh:
             json.dump(history, fh, indent=2, ensure_ascii=False)
 
-        if valid_loss < best_valid_loss-0.003: 
+        if valid_acc > best_valid_acc:
+            best_valid_acc = valid_acc
+            print('>> save new best_acc ckpt')
+            torch.save(model.state_dict(), save_acc_path)
+            epochs_no_improve = 0
+
+        if valid_loss < best_valid_loss - 0.003: 
             best_valid_loss = valid_loss
+            print('')
             torch.save(model.state_dict(), save_path)
             epochs_no_improve = 0  # Reset the counter since we have improvement
         else:
@@ -131,7 +141,7 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
 if __name__ == '__main__':
     # Settings 
     DEVICE = "cuda:0"
-    BATCH_SIZE = 64 # todo: 修改为合适的配置
+    BATCH_SIZE = 32 # todo: 修改为合适的配置
     NUM_EPOCHS = 30 
     PATIENCE = 5 # if PATIENCE与NUM_EPOCHS相等，则不会触发early stopping
     OUTPUT_DIR  = 'output'
@@ -185,6 +195,24 @@ if __name__ == '__main__':
     Epoch 10/30 - Train loss: 1.4922973, Train acc: 49.829%, Valid loss: 1.5078132, Valid acc: 45.600%
     Epoch 11/30 - Train loss: 1.4906985, Train acc: 50.057%, Valid loss: 1.5063520, Valid acc: 46.133%
     Epoch 12/30 - Train loss: 1.4888429, Train acc: 49.771%, Valid loss: 1.5053731, Valid acc: 46.000%
+    [不使用数据规范化, 精度略次]
+    Epoch  1/30 - Train loss: 1.5854637, Train acc: 29.829%, Valid loss: 1.5572556, Valid acc: 39.200%
+    Epoch  2/30 - Train loss: 1.5456625, Train acc: 37.886%, Valid loss: 1.5323892, Valid acc: 41.733%
+    Epoch  3/30 - Train loss: 1.5274053, Train acc: 42.343%, Valid loss: 1.5203095, Valid acc: 43.333%
+    Epoch  4/30 - Train loss: 1.5179104, Train acc: 40.057%, Valid loss: 1.5149054, Valid acc: 38.267%
+    Epoch  5/30 - Train loss: 1.5128518, Train acc: 42.400%, Valid loss: 1.5080526, Valid acc: 42.133%
+    Epoch  6/30 - Train loss: 1.5071378, Train acc: 42.343%, Valid loss: 1.5039527, Valid acc: 44.000%
+    Epoch  7/30 - Train loss: 1.5027398, Train acc: 43.829%, Valid loss: 1.5022688, Valid acc: 43.333%
+    Epoch  8/30 - Train loss: 1.4988990, Train acc: 44.229%, Valid loss: 1.4997599, Valid acc: 43.733%
+    Epoch  9/30 - Train loss: 1.4982745, Train acc: 42.400%, Valid loss: 1.4976709, Valid acc: 43.467%
+    Epoch 10/30 - Train loss: 1.4956283, Train acc: 44.571%, Valid loss: 1.4969729, Valid acc: 44.933%  <-best
+    Epoch 11/30 - Train loss: 1.4954090, Train acc: 45.029%, Valid loss: 1.4965294, Valid acc: 41.867%
+    Epoch 12/30 - Train loss: 1.4933487, Train acc: 45.257%, Valid loss: 1.4942989, Valid acc: 44.933%
+    Epoch 13/30 - Train loss: 1.4916334, Train acc: 42.171%, Valid loss: 1.4929709, Valid acc: 44.667%
+    Epoch 14/30 - Train loss: 1.4907677, Train acc: 44.343%, Valid loss: 1.4925091, Valid acc: 44.400%
+    Epoch 15/30 - Train loss: 1.4904052, Train acc: 42.514%, Valid loss: 1.4926861, Valid acc: 43.200%
+    Epoch 16/30 - Train loss: 1.4891938, Train acc: 44.686%, Valid loss: 1.4935781, Valid acc: 41.200%
+    Epoch 17/30 - Train loss: 1.4880423, Train acc: 44.629%, Valid loss: 1.4902040, Valid acc: 42.400%
     '''
     # 创建一个量子神经网络模型
     model_config = {'num_qubits': 12, 'num_layers': 600} # todo: 修改为合适的配置
@@ -196,6 +224,7 @@ if __name__ == '__main__':
         pickle.dump(model_config, file)
 
     # 训练模型
+    ts_start = time()
     train_model(
         model,
         optimizer,
@@ -206,3 +235,5 @@ if __name__ == '__main__':
         device=DEVICE,
         patience=PATIENCE,
     )
+    ts_end = time()
+    print('>> train clf_model time cost:', ts_end - ts_start)

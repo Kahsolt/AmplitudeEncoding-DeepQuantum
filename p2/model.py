@@ -4,11 +4,12 @@ from collections import Counter
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import numpy as np
 import deepquantum as dq
 
-from utils import QCIFAR10Dataset, PerfectAmplitudeEncodingDataset, reshape_norm_padding, get_fidelity
+from utils import QCIFAR10Dataset, PerfectAmplitudeEncodingDataset, reshape_norm_padding, get_fidelity, count_gates
 
 # 设置随机种子
 SEED = 42
@@ -29,7 +30,7 @@ class QuantumNeuralNetwork(nn.Module):
         super().__init__()
         self.num_qubits = num_qubits
         self.num_layers = num_layers
-        self.loss_fn =  nn.CrossEntropyLoss()
+        self.loss_fn = F.cross_entropy
         self.var_circuit = dq.QubitCircuit(num_qubits)
         self.create_var_circuit()
 
@@ -46,14 +47,14 @@ class QuantumNeuralNetwork(nn.Module):
         self.var_circuit.observable(wires=3, basis='z')   
         self.var_circuit.observable(wires=4, basis='z') 
 
+        print('classifier gate count:', count_gates(self.var_circuit))
 
     def forward(self, z, y):
-        # 将输入态经过设定的线路进行演化
         self.var_circuit(state=z)   
-        # 测量期望值                 
         output = self.var_circuit.expectation()          
-        return  self.loss_fn(output, y), output
-    
+        return self.loss_fn(output, y), output
+
+    @torch.inference_mode()
     def inference(self, z):
         """
         推理接口。
@@ -61,7 +62,6 @@ class QuantumNeuralNetwork(nn.Module):
             数据z是一个batch的图像数据对应的量子态，z的形状是(batch_size, 2**num_qubits, 1)，数据类型是torch.complex64。
         返回：
             output的形状是(batch_size, num_class)，数据类型是torch.float32。
-
         """
         self.var_circuit(state=z)
         output = self.var_circuit.expectation()     

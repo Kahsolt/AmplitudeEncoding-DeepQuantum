@@ -59,7 +59,7 @@ def test_model(model, test_loader, device):
     y_pred = torch.cat(y_pred, dim=0)
     y_true = torch.cat(y_true, dim=0)
     
-    y_pred = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+    y_pred = torch.argmax(y_pred, dim=1)
     acc = get_acc(y_pred, y_true)
     fid = get_fidelity(state_pred, state_true)
 
@@ -84,11 +84,11 @@ if __name__ == '__main__':
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
         test_dataset = pickle.load(file)
     t1 = time.time()
-    print(f'>> load pickle done ({t1 - t0:.3f}s)')
+    print(f'>> load pickle done ({t1 - t0:.3f}s)')      # 0.121s
     t0 = time.time()
     is_valid = validate_test_dataset(test_dataset)
     t1 = time.time()
-    print(f'>> check dataset done ({t1 - t0:.3f}s)')
+    print(f'>> check dataset done ({t1 - t0:.3f}s)')    # 1.583s
     if not is_valid:
         raise RuntimeError('test_dataset is not valid')
 
