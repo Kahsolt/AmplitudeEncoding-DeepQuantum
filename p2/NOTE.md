@@ -30,6 +30,13 @@ test acc:   0.360  /  0.352   /  0.360
 test gates:   79   /   157    /   235
 runtime:    15.163 /  15.341  /  15.272
 客观得分:   327.702 / 327.634  / 326.741
+ℹ 需达到 fid=0.95 左右，可视化为图像才看起来有人类可识别的同一性
+
+[Trail 1] qam_flatten
+- enc: vqc_F1_all_wise_init_0 (d=1), no_data_norm
+test fid: 0.906
+- enc: vqc_F1_all_wise_init (d=3), no_data_norm
+test fid: 0.903
 ```
 
 

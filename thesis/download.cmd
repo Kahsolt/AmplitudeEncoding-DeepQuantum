@@ -67,3 +67,19 @@ wget -nc https://arxiv.org/pdf/2107.03630v1.pdf
 
 REM Quantum convolutional neural network for classical data classification
 wget -nc https://arxiv.org/pdf/2108.00661.pdf
+
+
+:QDecisionTree
+
+REM Quantum decision tree classifier
+REM https://www.researchgate.net/publication/260526004_Quantum_decision_tree_classifier
+
+REM On Quantum Decision Trees
+wget -nc https://arxiv.org/pdf/1703.03693.pdf
+
+REM The Quantum Version Of Classification Decision Tree Constructing Algorithm C5.0
+wget -nc https://arxiv.org/pdf/1907.06840.pdf
+
+REM Representation of binary classification trees with binary features by quantum circuits
+REM https://quantum-journal.org/papers/q-2022-03-30-676/
+REM https://github.com/RaoulHeese/qtree
