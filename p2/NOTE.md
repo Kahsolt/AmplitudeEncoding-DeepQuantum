@@ -19,3 +19,14 @@ test gates: 1212.000
 runtime: 111.535
 客观得分: 146.514
 ```
+
+
+### Appendix
+
+⚪ Classical classifiers baselines
+
+| model | accuracy |
+| :-: | :-: |
+| vgg11     | 94.0% |
+| resnet18  | 91.0% |
+| mbnetv3_s | 86.6% |
