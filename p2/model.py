@@ -36,16 +36,66 @@ class QuantumNeuralNetwork(nn.Module):
 
     def create_var_circuit(self):
         """构建变分量子线路"""
-        for i in range(self.num_layers):
+
+        # n_layer=600, gcnt=14400, pcnt=7200
+        if 'baseline':
+            for i in range(self.num_layers):
+                self.var_circuit.rylayer()
+                self.var_circuit.cnot_ring()
+                self.var_circuit.barrier()
+            # num of observable == num of classes
+            self.var_circuit.observable(wires=0, basis='z')
+            self.var_circuit.observable(wires=1, basis='z')
+            self.var_circuit.observable(wires=2, basis='z')
+            self.var_circuit.observable(wires=3, basis='z')
+            self.var_circuit.observable(wires=4, basis='z')
+
+        # n_layer=80, gcnt=6850, pcnt=20550; acc=0.340
+        if not 'real mera-like, [u3-enc-u3-dec]-enc-u3':
+            for i in range(self.num_layers):
+                self.var_circuit.u3layer()
+                # down (->12-10-8-6-4-2)
+                for offset in range(self.num_qubits // 2):
+                    for q in range(offset, self.num_qubits - 1 - offset, 2):
+                        self.var_circuit.cu(q, q + 1)
+                        self.var_circuit.cu(q + 1, q)
+                if i < self.num_layers-1:
+                    self.var_circuit.u3layer(wires=[5, 6])
+                    # up (->2-4-6-8-10)
+                    for offset in range(self.num_qubits // 2 - 1, 0, -1):
+                        for q in range(offset, self.num_qubits - 1 - offset, 2):
+                            self.var_circuit.cu(q + 1, q)
+                            self.var_circuit.cu(q, q + 1)
+            self.var_circuit.u3layer(wires=[5, 6])
+
+            self.var_circuit.observable(wires=5, basis='z')
+            self.var_circuit.observable(wires=6, basis='z')
+            self.var_circuit.observable(wires=5, basis='x')
+            self.var_circuit.observable(wires=6, basis='x')
+            self.var_circuit.observable(wires=5, basis='y')
+
+        # n_layer=80, gcnt=8812, pcnt=7852; acc=
+        if not 'real mera-like, [ry-enc-ry-dec]-ry':
+            for i in range(self.num_layers):
+                self.var_circuit.rylayer()
+                # down (->12-10-8-6-4-2)
+                for offset in range(self.num_qubits // 2):
+                    for q in range(offset, self.num_qubits - 1 - offset, 2):
+                        self.var_circuit.cry(q, q + 1)
+                        self.var_circuit.cry(q + 1, q)
+                self.var_circuit.rylayer(wires=[5, 6])
+                # up (->2-4-6-8-10)
+                for offset in range(self.num_qubits // 2 - 1, 0, -1):
+                    for q in range(offset, self.num_qubits - 1 - offset, 2):
+                        self.var_circuit.cry(q + 1, q)
+                        self.var_circuit.cry(q, q + 1)
             self.var_circuit.rylayer()
-            self.var_circuit.cnot_ring()
-            self.var_circuit.barrier()
-        # num of observable == num of classes
-        self.var_circuit.observable(wires=0, basis='z') 
-        self.var_circuit.observable(wires=1, basis='z') 
-        self.var_circuit.observable(wires=2, basis='z') 
-        self.var_circuit.observable(wires=3, basis='z')   
-        self.var_circuit.observable(wires=4, basis='z') 
+
+            self.var_circuit.observable(wires=0, basis='z')
+            self.var_circuit.observable(wires=1, basis='z')
+            self.var_circuit.observable(wires=2, basis='z')
+            self.var_circuit.observable(wires=3, basis='z')
+            self.var_circuit.observable(wires=4, basis='z')
 
         print('classifier gate count:', count_gates(self.var_circuit))
 

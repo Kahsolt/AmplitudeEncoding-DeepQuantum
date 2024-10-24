@@ -236,4 +236,4 @@ if __name__ == '__main__':
         patience=PATIENCE,
     )
     ts_end = time()
-    print('>> train clf_model time cost:', ts_end - ts_start)
+    print('>> train clf_model time cost:', ts_end - ts_start)   # 5531s
