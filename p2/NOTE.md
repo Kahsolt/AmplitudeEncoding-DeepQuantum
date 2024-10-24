@@ -34,10 +34,12 @@ runtime:    15.163 /  15.341  /  15.272
 
 [Trail 1] qam_flatten
 | encoder | n_layer | fidelity | comment |
-| vqc_F1_all_wise_init_0 | 1 | 0.906 | no_data_norm |
 | vqc_F1_all_wise_init   | 3 | 0.903 | no_data_norm |
-| vqc_F2_all_wise_init_0 | 1 | 0.946 | no_data_norm (⭐) |
+| vqc_F1_all_wise_init_0 | 1 | 0.906 | no_data_norm |
+| vqc_F2_all_wise_init_0 | 1 | 0.946 | no_data_norm |
 | vqc_F2_all_wise_init_0 | 2 | 0.961 | no_data_norm |
+| vqc_F1_all_wise_init_0 | 1 | 0.935 | no_data_norm, hwc order |
+| vqc_F2_all_wise_init_0 | 1 | 0.952 | no_data_norm, hwc order (⭐) |
 ```
 
 

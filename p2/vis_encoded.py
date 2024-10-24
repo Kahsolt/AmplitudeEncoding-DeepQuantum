@@ -26,7 +26,7 @@ def get_fidelity(state_pred:Tensor, state_true:Tensor) -> Tensor:
   fidelity = (state_pred * state_true).sum(-1)**2
   return fidelity.mean()
 
-def inv_qam_reshape_norm_padding(z:Tensor) -> Tensor:
+def inv_qam_reshape_norm_padding(z:Tensor) -> Tensor:  # 只适用于小端序
   assert len(z) == 2**12
   cvs = torch.empty([64, 64], dtype=z.dtype, device=z.device)
   for i, (x, y) in enumerate(qam_index_generator()):
@@ -73,5 +73,8 @@ if __name__ == '__main__':
   parser.add_argument('-fp', default='./output/test_dataset.pkl', help='path to encode test_dataset.pkl')
   parser.add_argument('-F', default='std', choices=['std', 'qam'], help='flatten method')
   args = parser.parse_args()
+
+  print('WARN: 如果可视化图像看起来不对，请确认 -F 参数设置正确')
+  print('大端序/hwc格式目前没实现合适的 inv 函数，所以可视化就是不对的 :(')
 
   run(args)

@@ -66,6 +66,7 @@ def reshape_norm_padding(x:Tensor, use_hijack:bool=True) -> Tensor:
     return x.unsqueeze(-1)  # (batch_size, 4096, 1)
 
 bits_to_coord_cache = None
+bits_to_coord_flip_cache = None
 def _make_bits_to_coord_cache(nbps:int=12):
     ''' ↓↓↓ copy from https://github.com/NVlabs/sionna/blob/main/sionna/mapping.py '''
     def pam_gray(b:int):
@@ -77,22 +78,31 @@ def _make_bits_to_coord_cache(nbps:int=12):
             c[i] = pam_gray(b[0::2]) + 1j*pam_gray(b[1::2]) # PAM in each dimension
         return c
     ''' ↑↑↑ copy from https://github.com/NVlabs/sionna/blob/main/sionna/mapping.py '''
+
+    def le_to_be(idx:int) -> int:   # bit string little-endian to big endian in dec fmt
+        bstr = bin(idx)[2:].rjust(nbps, '0')
+        bstr_rev = bstr[::-1]
+        return int(bstr_rev, base=2)
+
     # ref: https://nvlabs.github.io/sionna/examples/Hello_World.html
     constellation = qam(nbps)   # 1024-QAM (32x32 pixels per channel)
     bits_to_coord = np.asarray([(int(pt.real), int(pt.imag)) for pt in constellation], dtype=np.int32)
     bits_to_coord -= bits_to_coord.min()
     bits_to_coord //= 2
-    global bits_to_coord_cache
+    bits_to_coord_flip = [(le_to_be(i), xy) for i, xy in enumerate(bits_to_coord)]
+    bits_to_coord_flip.sort()
+    bits_to_coord_flip = [xy for _, xy in bits_to_coord_flip]   # chw -> hwc
+    global bits_to_coord_cache, bits_to_coord_flip_cache
     bits_to_coord_cache = bits_to_coord
+    bits_to_coord_flip_cache = bits_to_coord_flip
 
-def qam_index_generator(nbps:int=12, flip:bool=False) -> Generator[Tuple[int, int], int, None]:
+def qam_index_generator(nbps:int=12, flip:bool=True) -> Generator[Tuple[int, int], int, None]:
     if bits_to_coord_cache is None:
         _make_bits_to_coord_cache(nbps)
-    bits_to_coord = bits_to_coord_cache
-    for xy in (reversed(bits_to_coord) if flip else bits_to_coord):
+    for xy in (bits_to_coord_flip_cache if flip else bits_to_coord_cache):
         yield xy
 
-def qam_reshape_norm_padding(x:Tensor, flip:bool=False) -> Tensor:
+def qam_reshape_norm_padding(x:Tensor, hwc_order:bool=True) -> Tensor:
     has_batch = True
     if x.dim() == 3:
         x = x.unsqueeze(0)
@@ -102,20 +112,20 @@ def qam_reshape_norm_padding(x:Tensor, flip:bool=False) -> Tensor:
     三通道RGB拼贴为单通道大图，布局为：
       | B | R |
       | 0 | G |
-    以满足前缀索引：
-      |00...> - G
-      |01...> - G
-      |10...> - B
-      |11...> - 全0
+    以满足后缀索引 (大端序)：
+      |...00> - G
+      |...10> - G
+      |...01> - B
+      |...11> - 全0
     '''
     null_channel = torch.zeros_like(x[:, 0, ...])   # [B, H=32, W=32]
-    x_ex = torch.cat([              # [B, H_ex=64, W_ex=64]，注意H/W翻转
+    x_ex = torch.cat([              # [B, H_ex=64, W_ex=64]，魔法顺序！ :(
         torch.cat([x[:, 2, ...], null_channel], dim=-1),
         torch.cat([x[:, 0, ...], x[:, 1, ...]], dim=-1),
     ], dim=1)
     assert len(x_ex.shape) == 3     # [B, H_ex, W_ex]
     pixels = []
-    for i, j in qam_index_generator(flip=flip):
+    for i, j in qam_index_generator(flip=hwc_order):
         pixels.append(x_ex[:, i, j])
     x = torch.stack(pixels, -1)     # [B, H_ex*W_ex]
     x = F.normalize(x, p=2, dim=-1)
@@ -258,21 +268,9 @@ class PerfectAmplitudeEncodingDataset(Dataset):
 # 注意: 决赛的数据集名字必须固定为 QCIFAR10Dataset
 # todo: 构建振幅编码线路
 is_show_gate_count = True
-def encode_single_data(data):
+def encode_single_data(data, debug:bool=False):
     global is_show_gate_count
     image, label = data     # [3, 32, 32], []
-
-    # [n_rep=14] fid=0.942, gcnt=337, timecost=1272s
-    def vqc_submit_p1_modify(nq:int, n_rep:int=14):
-        vqc = dq.QubitCircuit(nqubit=nq)
-        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
-        g.init_para([np.pi])
-        vqc.add(g)
-        for _ in range(n_rep):
-            for q in range(nq):
-                vqc.ry(wires=(q+1)%nq, controls=q)
-                vqc.ry(wires=q, controls=(q+1)%nq)
-        return vqc
 
     # std flatten:
     # [n_rep=1] fid=0.930, gcnt=79, timecost=1324s; n_iter=500, n_worker=8
@@ -280,7 +278,9 @@ def encode_single_data(data):
     # [n_rep=3] fid=0.965, gcnt=235, timecost=836s; n_iter=100, n_worker=8
     # qam flatten:
     # [n_rep=1] fid=0.906, gcnt=79, timecost=1082s; n_iter=500, n_worker=16
-    def vqc_F1_all_wise_init_0(nq:int=12, n_rep:int=2):
+    # qam flatten (hwc order):
+    # [n_rep=1] fid=0.935, gcnt=79, timecost=457s; n_iter=200, n_worker=16
+    def vqc_F1_all_wise_init_0(nq:int=12, n_rep:int=1):
         ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)
         g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
@@ -299,18 +299,29 @@ def encode_single_data(data):
         return vqc
 
     # qam flatten:
-    # [n_rep=1] fid=0.784, gcnt=79,  timecost=441;  n_iter=200, n_worker=16
-    # [n_rep=3] fid=0.903, gcnt=235, timecost=1319; n_iter=200, n_worker=16
-    def vqc_F1_all_wise_init(nq:int=12, n_rep:int=2):
-        ''' RY(single init) - [pairwise(F2) - RY] '''
+    # [n_rep=1] fid=0.946, gcnt=145, timecost=851s; n_iter=200, n_worker=16
+    # [n_rep=2] fid=0.961, gcnt=289, timecost=1565s; n_iter=200, n_worker=16
+    # qam flatten (hwc order):
+    # [n_rep=1] fid=0.952, gcnt=145, timecost=805s; n_iter=200, n_worker=16
+    def vqc_F2_all_wise_init_0(nq:int=12, n_rep:int=1):
+        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)
-        vqc.ry(wires=0)     # only init wire 0
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
+        g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+        vqc.add(g)
         for _ in range(n_rep):
             for i in range(nq-1):   # qubit order
                 for j in range(i+1, nq):
-                    vqc.ry(wires=j, controls=i)
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
             for i in range(nq):
-                vqc.ry(wires=i)
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
         return vqc
 
     # qam flatten:
@@ -338,7 +349,7 @@ def encode_single_data(data):
         return vqc
 
     n_iter = 200
-    encoding_circuit = vqc_F2_all_wise_init_0(12, 2)
+    encoding_circuit = vqc_F1_all_wise_init_0(12, 1)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
         is_show_gate_count = False
@@ -355,12 +366,15 @@ def encode_single_data(data):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-    if not 'plot':
+    if debug:
         tht0 = encoding_circuit.operators[0].theta
         print('tht0:', tht0.item())
         import matplotlib.pyplot as plt
-        plt.plot(loss_list)
+        plt.subplot(211) ; plt.plot(loss_list)             ; plt.title('loss')
+        plt.subplot(212) ; plt.plot(target.real.flatten()) ; plt.title('target')
+        plt.tight_layout()
         plt.show()
+        breakpoint()
     print('fid:', -loss.item())
 
     # Detach the state tensor before returning
@@ -379,14 +393,16 @@ class QCIFAR10Dataset(Dataset):
         self.dataset = CIFAR10Dataset(train=train, size=size)
         self.num_total_gates = 0
         ts_start = time()
-        self.quantum_dataset = self.encode_data()
-        #self.quantum_dataset = self.encode_data_single_thread()
+        if os.getenv('DEBUG'):
+            self.quantum_dataset = self.encode_data_single_thread()
+        else:
+            self.quantum_dataset = self.encode_data()
         ts_end = time()
         print('>> amp_enc_vqc time cost:', ts_end - ts_start)
         del self.dataset
 
     def encode_data_single_thread(self):
-        results = [encode_single_data(it) for it in self.dataset]
+        results = [encode_single_data(it, debug=True) for it in self.dataset]
         quantum_dataset = [(image, label, state_vector) for image, label, state_vector, _ in results]
         self.num_total_gates = sum(gate_count for _, _, _, gate_count in results)
         return quantum_dataset
@@ -405,7 +421,7 @@ class QCIFAR10Dataset(Dataset):
         quantum_dataset = [(image, label, state_vector) for image, label, state_vector, _ in results]
         self.num_total_gates = sum(gate_count for _, _, _, gate_count in results)
         return quantum_dataset
-    
+
     def get_gates_count(self):
         """计算在这个数据集上的编码线路门的平均个数"""
         return self.num_total_gates / len(self.quantum_dataset)
@@ -414,10 +430,7 @@ class QCIFAR10Dataset(Dataset):
         return len(self.quantum_dataset)
 
     def __getitem__(self, idx):
-        x = self.quantum_dataset[idx][0]
-        y = self.quantum_dataset[idx][1]
-        z = self.quantum_dataset[idx][2]
-        return x, y, z
+        return self.quantum_dataset[idx]
 
 
 if __name__ == '__main__':
