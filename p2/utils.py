@@ -325,27 +325,29 @@ def encode_single_data(data, debug:bool=False):
         return vqc
 
     # qam flatten:
-    # [n_rep=1] fid=0.946, gcnt=145, timecost=851s; n_iter=200, n_worker=16
-    # [n_rep=2] fid=0.961, gcnt=289, timecost=1565s; n_iter=200, n_worker=16
-    def vqc_F2_all_wise_init_0(nq:int=12, n_rep:int=2):
+    # [n_rep=1] fid=NaN, gcnt=171, timecost=NaN; n_iter=200, n_worker=16
+    def vqc_F1_all_wise_init_0_specialize_channel_qubits(nq:int=12, n_rep:int=None):
         ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        ''' 考虑到 qam flatten 排列下 |x11> 是全0，而 |x00> |x10> |x01> 是大致相似的，我们特殊处理代表 channel 意义的 2 个比特；几乎能做到 |x11> 拟合到全0，但是其他地方拟合不好 '''
         vqc = dq.QubitCircuit(nqubit=nq)
-        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
-        g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
-        vqc.add(g)
-        for _ in range(n_rep):
-            for i in range(nq-1):   # qubit order
+        # the channel qubits 0~1 is the main 1/3 weight distributor
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)             ; g.init_para([np.pi])   ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=1, controls=0, requires_grad=True) ; g.init_para([np.pi/2]) ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=0, controls=1, requires_grad=True) ; g.init_para([np.pi/2]) ; vqc.add(g)
+        # the spatial qubits 2~12 is the evil, handle each channel
+        def add_F1_seg():
+            for i in range(2, nq-1):   # qubit order
                 for j in range(i+1, nq):
                     g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
                     g.init_para([0.0])
                     vqc.add(g)
-                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
-                    g.init_para([0.0])
-                    vqc.add(g)
-            for i in range(nq):
+            for i in range(2, nq):
                 g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
                 g.init_para([0.0])
                 vqc.add(g)
+        vqc.x(wires=1) ; add_F1_seg()   # |x10>
+        vqc.x(wires=0) ; add_F1_seg()   # |x11>
+        vqc.x(wires=1) ; add_F1_seg()   # |x01>
         return vqc
 
     n_iter = 200
@@ -369,9 +371,14 @@ def encode_single_data(data, debug:bool=False):
     if debug:
         tht0 = encoding_circuit.operators[0].theta
         print('tht0:', tht0.item())
+        print('fid:', -loss.item())
         import matplotlib.pyplot as plt
-        plt.subplot(211) ; plt.plot(loss_list)             ; plt.title('loss')
-        plt.subplot(212) ; plt.plot(target.real.flatten()) ; plt.title('target')
+        plt.subplot(211) ; plt.plot(loss_list) ; plt.title('loss')
+        plt.subplot(212)
+        plt.plot(target        .real.flatten(), 'b', label='target')
+        plt.plot(state.detach().real.flatten(), 'r', label='state')
+        plt.legend()
+        plt.title('values')
         plt.tight_layout()
         plt.show()
         breakpoint()
