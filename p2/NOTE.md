@@ -33,10 +33,11 @@ runtime:    15.163 /  15.341  /  15.272
 ℹ 需达到 fid=0.95 左右，可视化为图像才看起来有人类可识别的同一性
 
 [Trail 1] qam_flatten
-- enc: vqc_F1_all_wise_init_0 (d=1), no_data_norm
-test fid: 0.906
-- enc: vqc_F1_all_wise_init (d=3), no_data_norm
-test fid: 0.903
+| encoder | n_layer | fidelity | comment |
+| vqc_F1_all_wise_init_0 | 1 | 0.906 | no_data_norm |
+| vqc_F1_all_wise_init   | 3 | 0.903 | no_data_norm |
+| vqc_F2_all_wise_init_0 | 1 | 0.946 | no_data_norm (⭐) |
+| vqc_F2_all_wise_init_0 | 2 | 0.961 | no_data_norm |
 ```
 
 

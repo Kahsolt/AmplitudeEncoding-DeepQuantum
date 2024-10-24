@@ -44,22 +44,27 @@ def run(args):
     test_dataset = pkl.load(file)
     
   for x, y, z_ in test_dataset:
-    z_vec = z_.flatten().real
+    vec_z = z_.flatten().real
     if args.F == 'std':
       vec_x = reshape_norm_padding(x, use_hijack=False)
-      z = z_vec.reshape(-1, 32, 32)[:3, ...]
+      z = vec_z.reshape(-1, 32, 32)[:3, ...]
     elif args.F == 'qam':
       vec_x = qam_reshape_norm_padding(x)
-      z = inv_qam_reshape_norm_padding(z_vec)
+      z = inv_qam_reshape_norm_padding(vec_z)
 
     im_x = img_to_01(x).permute([1, 2, 0]).numpy()
     im_z = img_to_01(z).permute([1, 2, 0]).numpy()
     fid = get_fidelity(vec_x, z_)
 
     plt.clf()
-    plt.subplot(121) ; plt.imshow(im_x) ; plt.title('x')
-    plt.subplot(122) ; plt.imshow(im_z) ; plt.title('z')
+    plt.subplot(221) ; plt.imshow(im_x) ; plt.title('x')
+    plt.subplot(222) ; plt.imshow(im_z) ; plt.title('z')
+    plt.subplot(212)
+    plt.plot(vec_x, 'b', label='vec_x')
+    plt.plot(vec_z, 'r', label='vec_z')
+    plt.legend()
     plt.suptitle(f'Fid: {fid}')
+    plt.tight_layout()
     plt.show()
 
 

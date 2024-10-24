@@ -313,8 +313,32 @@ def encode_single_data(data):
                 vqc.ry(wires=i)
         return vqc
 
+    # qam flatten:
+    # [n_rep=1] fid=0.946, gcnt=145, timecost=851s; n_iter=200, n_worker=16
+    # [n_rep=2] fid=0.961, gcnt=289, timecost=1565s; n_iter=200, n_worker=16
+    def vqc_F2_all_wise_init_0(nq:int=12, n_rep:int=2):
+        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
+        g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+        vqc.add(g)
+        for _ in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                for j in range(i+1, nq):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
+        return vqc
+
     n_iter = 200
-    encoding_circuit = vqc_F1_all_wise_init_0(12, 1)
+    encoding_circuit = vqc_F2_all_wise_init_0(12, 2)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
         is_show_gate_count = False
