@@ -360,7 +360,7 @@ def vqc_exF2(nq:int, n_rep:int=1, entgl_rule:str='linear', end_RY:bool=True):
   return vqc
 
 def vqc_F1_all_wise_init(nq:int, n_rep:int=1):
-  ''' RY(single init) - [pairwise(F2) - RY] '''
+  ''' RY(single init) - [pairwise(F1) - RY] '''
   vqc = dq.QubitCircuit(nqubit=nq)
   vqc.ry(wires=0)   # only init wire 0
   for _ in range(n_rep):
@@ -372,7 +372,7 @@ def vqc_F1_all_wise_init(nq:int, n_rep:int=1):
   return vqc
 
 def vqc_F1_all_wise_init_0(nq:int, n_rep:int=1):
-  ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+  ''' RY(single init) - [pairwise(F1) - RY], param zero init '''
   vqc = dq.QubitCircuit(nqubit=nq)
   g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
   g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
@@ -389,8 +389,27 @@ def vqc_F1_all_wise_init_0(nq:int, n_rep:int=1):
       vqc.add(g)
   return vqc
 
+def vqc_F1_all_RX_0(nq:int, n_rep:int=1):
+  ''' RY - [pairwise(F1) - RX], param zero init; aka. RealAmplitudes, see https://github.com/Qiskit/qiskit/blob/main/qiskit/circuit/library/n_local/real_amplitudes.py '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for i in range(nq):
+    g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+    g.init_para([0.0])
+    vqc.add(g)
+  for _ in range(n_rep):
+    for i in range(nq-1):   # qubit order
+      for j in range(i+1, nq):
+        g = dq.Rx(nqubit=nq, wires=j, controls=i, requires_grad=True)
+        g.init_para([0.0])
+        vqc.add(g)
+    for i in range(nq):
+      g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+      g.init_para([0.0])
+      vqc.add(g)
+  return vqc
+
 def vqc_F1_gap_order_wise_init(nq:int, n_rep:int=1):
-  ''' RY(single init) - [pairwise(F2, gap_order) - RY] '''
+  ''' RY(single init) - [pairwise(F1, gap_order) - RY] '''
   vqc = dq.QubitCircuit(nqubit=nq)
   vqc.ry(wires=0)   # only init wire 0
   for _ in range(n_rep):
@@ -402,7 +421,7 @@ def vqc_F1_gap_order_wise_init(nq:int, n_rep:int=1):
   return vqc
 
 def vqc_F1_gap_order_wise_init_0(nq:int, n_rep:int=1):
-  ''' RY(single init) - [pairwise(F2, gap_order) - RY], param zero init '''
+  ''' RY(single init) - [pairwise(F1, gap_order) - RY], param zero init '''
   vqc = dq.QubitCircuit(nqubit=nq)
   g = dq.Ry(wires=0, nqubit=nq, requires_grad=True)   # only init wire 0
   g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
@@ -433,7 +452,7 @@ def vqc_F1_s_all_wise_init(nq:int, n_rep:int=1):
   return vqc
 
 def vqc_F1_HEA_wise_init(nq:int, n_rep:int=1, entgl:str='CRY', entgl_rule:str='linear'):
-  ''' RY(single init) - [linear(F2) - RY] '''
+  ''' RY(single init) - [linear(F1) - RY] '''
   if   entgl_rule == 'linear': offset = 1
   elif entgl_rule == 'cyclic': offset = 0
   else: raise ValueError
@@ -1107,6 +1126,8 @@ if not 'nq=12':
     run_test(partial(vqc_F1_gap_order_wise_init,   12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
     # gcnt=155, fid=0.95962, ts=175.082s; score~=2.76424
     run_test(partial(vqc_F1_gap_order_wise_init_0, 12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
+    # gcnt=168, fid=0.77040, ts=202.099s
+    run_test(partial(vqc_F1_all_RX_0,              12, 2), lr=0.02, n_repeat=5, data_gen=rand_cifar10)
 
     # gcnt=79, fid=0.76987, ts=86.685s
     run_test(partial(vqc_F1_all_wise_init, 12, 1), lr=0.02, n_repeat=5, data_gen=rand_cifar10_HWC)
@@ -1382,6 +1403,27 @@ if not 'nq=10':
   run_test(partial(vqc_RY_cyclic_CZ, 10, 12), lr=0.02, n_repeat=3)
   # gcnt=330, fid=0.16255, ts=114.043s
   run_test(partial(vqc_RY_cyclic_CZ, 10, 16), lr=0.02, n_repeat=3)
+
+
+''' U3-cyclic(CZ) from arXiv:2107.03630 '''
+
+def vqc_U3_cyclic_CZ(nq:int, n_rep:int=10):
+  ''' The idea is straigh-forward: U3 for abs(amp) value, CZ for sign of the phase (pos/neg) '''
+  vqc = dq.QubitCircuit(nqubit=nq)
+  for _ in range(n_rep):
+    for i in range(nq):
+      vqc.u3(i)
+    for i in range(0, nq-1, 2):
+      vqc.cz((i+1)%nq, i)
+  return vqc
+
+if not 'nq=10':
+  # gcnt=150, fid=0.03829, ts=108.025s
+  run_test(partial(vqc_U3_cyclic_CZ, 10, 10), lr=0.02, n_repeat=3)
+
+if not 'nq=12':
+  # gcnt=180, fid=0.83543, ts=134.693s
+  run_test(partial(vqc_U3_cyclic_CZ, 12, 10), lr=0.02, n_repeat=3, data_gen=rand_cifar10)
 
 
 ''' RY-adjacent(CNOT) from https://arxiv.org/pdf/2103.13211 '''
