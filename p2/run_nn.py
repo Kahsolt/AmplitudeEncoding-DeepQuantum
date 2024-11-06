@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 batch_size = 64
+epochs = 100
 img_path = './img'
 
 try:
@@ -96,7 +97,7 @@ def train(model:nn.Module, trainloader:DataLoader, testloader:DataLoader) -> flo
   loss_list = []
   acc_list = []
   iter = 0
-  for epoch in range(30):
+  for epoch in range(epochs):
     model.train()
     for X, Y in trainloader:
       X = X.to(device)
@@ -147,7 +148,201 @@ def get_model_mobilenet_v3_small():
   model.classifier[-1] = fc_new
   return model
 
-model_getters = [v for k, v in globals().items() if k.startswith('get_model')]
+def get_model_cnn():
+  class CNN(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 6, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(6, 12, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(12, 6, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(6, 3, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Flatten(start_dim=1),
+        nn.Linear(12, 5),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN()
+
+def get_model_cnn_d3():
+  class CNN_d3(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 3, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(3, 3, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(3, 3, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Flatten(start_dim=1),
+        nn.Linear(48, 5),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d3()
+
+def get_model_cnn_d1():
+  class CNN_d1(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.ReLU(),
+        nn.Flatten(start_dim=1),
+        nn.Linear(16, 5),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d1()
+
+def get_model_cnn_d1_L():
+  class CNN_d1_L(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.Conv2d(1, 1, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.Conv2d(1, 1, kernel_size=3, padding=1),
+        nn.AvgPool2d(2, 2),
+        nn.Flatten(start_dim=1),
+        nn.Linear(16, 5),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d1_L()
+
+def get_model_cnn_d1_s2():
+  class CNN_d1_s2(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Flatten(start_dim=1),
+        nn.Linear(16, 5),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d1_s2()
+
+def get_model_cnn_d1_s2_nb():
+  class CNN_d1_s2_nb(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.ReLU(),
+        nn.Flatten(start_dim=1),
+        nn.Linear(16, 5, bias=False),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d1_s2_nb()
+
+def get_model_cnn_d1_s2_x16():
+  class CNN_d1_s2_x16(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1),
+        nn.ReLU(),
+        nn.Flatten(start_dim=1),
+        nn.Linear(4, 5),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d1_s2_x16()
+
+def get_model_cnn_d1_s2_x16_nb():
+  class CNN_d1_s2_x16_nb(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.ReLU(),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.ReLU(),
+        nn.Flatten(start_dim=1),
+        nn.Linear(4, 5, bias=False),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d1_s2_x16_nb()
+
+def get_model_cnn_d1_s2_x16_L():
+  class CNN_d1_s2_x16_L(nn.Module):
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.Conv2d(1, 1, kernel_size=3, stride=2, padding=1, bias=False),
+        nn.Flatten(start_dim=1),
+        nn.Linear(4, 5, bias=False),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_d1_s2_x16_L()
+
+def get_model_cnn_nano():
+  class CNN_nano(nn.Module):    # 最接近 QAMCNN 的工作方式
+    def __init__(self):
+      super().__init__()
+      self.cnn = nn.Sequential(
+        nn.Conv2d(3, 1, kernel_size=2, stride=2, bias=False),
+        nn.Conv2d(1, 1, kernel_size=2, stride=2, bias=False),
+        nn.Conv2d(1, 1, kernel_size=2, stride=2, bias=False),
+        nn.Conv2d(1, 1, kernel_size=2, stride=2, bias=False),
+        nn.Flatten(start_dim=1),
+        nn.Linear(4, 5, bias=False),
+      )
+    def forward(self, x):
+      return self.cnn(x)
+  return CNN_nano()
+
+#model_getters = [v for k, v in globals().items() if k.startswith('get_model')]
+#model_getters = [v for k, v in globals().items() if k.startswith('get_model_cnn')]
+model_getters = [get_model_cnn_d1_L]
 
 
 trainset = CIFAR10Dataset(train=True)
@@ -227,4 +422,5 @@ print('len(testset):',  len(testset),  'len(testloader):',  len(testloader))
 '''
 for get_model in model_getters:
   model = get_model().to(device)
+  print('param_cnt:', sum(p.numel() for p in model.parameters() if p.requires_grad))
   train(model, trainloader, testloader)
