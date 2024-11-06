@@ -40,7 +40,7 @@ runtime:    15.163 /  15.341  /  15.272
 | vqc_F2_all_wise_init_0 | 2 | 289 | 0.961 | 2.7775 | no_data_norm |
 | vqc_F1_all_wise_init_0 | 1 |  79 | 0.935 | 2.8305 | no_data_norm, hwc order |
 | vqc_F2_all_wise_init_0 | 1 | 145 | 0.952 | 2.8315 | no_data_norm, hwc order (⭐) |
-=> So far the best score:
+[Local 1]
 classifier gate count: 14400
 test fid: 0.952
 test acc: 0.420
@@ -53,6 +53,22 @@ Accuracy: 0.420
 振幅编码线路门的个数: 145.0
 运行时间: 5.347104549407959
 客观得分: 335.0461788574855
+
+[Trail 2] qam_flatten (optimize & bugfix)
+| encoder | n_layer | gate count | fidelity | score | comment |
+| vqc_F1_all_wise_init_0 | 1 |  79 | 0.910 | 2.7805 | no_data_norm |
+| vqc_F1_all_wise_init_0 | 2 | 157 | 0.949 | 2.8195 | no_data_norm |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.956 | 2.8385 | no_data_norm |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm, n_iter=500 (⭐) |
+| vqc_F2_all_wise_init_0 | 2 | 289 | 0.973 | 2.8015 | no_data_norm |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.951 | 2.8295 | no_data_norm, hwc order |
+[Local 2]
+classifier gate count: 14400
+test fid: 0.959
+test acc: 0.420
+test gates: 145.000
+runtime: 15.562
+客观得分: 336.131
 ```
 
 

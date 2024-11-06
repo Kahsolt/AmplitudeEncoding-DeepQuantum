@@ -2,6 +2,7 @@ import os
 import sys
 import random
 import pickle
+from copy import deepcopy
 from time import time
 import multiprocessing
 from collections import Counter
@@ -16,6 +17,7 @@ from torchvision.datasets import CIFAR10
 import torchvision.transforms as T
 import deepquantum as dq
 import numpy as np
+from numpy import ndarray
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
@@ -43,6 +45,115 @@ def count_gates(cir:dq.QubitCircuit):
             count += 1
     return count
 
+def get_fidelity(state_pred, state_true):
+    # state_pred, state_true: (batch_size, 4096, 1)
+    state_pred = state_pred.view(-1, 4096).real
+    state_true = state_true.view(-1, 4096).real
+    fidelity = (state_pred * state_true).sum(-1)**2
+    return fidelity.mean()
+
+@torch.inference_mode
+def get_acc(y_pred, y_true):
+    # 计算准确率
+    correct = (y_pred == y_true).float()
+    accuracy = correct.sum() / len(correct)
+    return accuracy.item()
+
+
+def add_suffix(x:ndarray, suffix:str) -> ndarray:
+  x = deepcopy(x)
+  W, H = x.shape
+  for i in range(W):
+    for j in range(H):
+      x[i, j] = x[i, j] + suffix
+  return x
+
+def get_qam_array(n:int) -> ndarray:
+  if n == 2:
+    ''' 大端序读取顺序：
+      10 ← 00
+         ↘
+      11 ← 01
+    '''
+    return np.asarray([
+      ['10', '00'],
+      ['11', '01'],
+    ], dtype=object)
+  else:
+    x = get_qam_array(n - 2)
+    W, H = x.shape
+    x_ex = np.empty([2*W, 2*H], dtype=x.dtype)
+    x_ex[:W, :H] = add_suffix(x[:, ::-1],    '10')
+    x_ex[:W, H:] = add_suffix(x,             '00')
+    x_ex[W:, :H] = add_suffix(x[::-1, ::-1], '11')
+    x_ex[W:, H:] = add_suffix(x[::-1, :],    '01')
+    return x_ex
+
+bits_to_coord_cache = None
+bits_to_coord_flip_cache = None
+def qam_index_generator(nbps:int, flip:bool=False) -> Generator[Tuple[int, int], int, None]:
+  global bits_to_coord_cache, bits_to_coord_flip_cache
+  if bits_to_coord_cache is None:
+    def bstr_as_le_int(s:str) -> int:
+      return int(s, base=2)
+    def bstr_as_be_int(s:str) -> int:
+      return int(s[::-1], base=2)
+
+    array = get_qam_array(nbps)
+    H, W = array.shape
+    le_bstr_to_loc = []
+    be_bstr_to_loc = []
+    for x in range(H):
+      for y in range(W):
+        bstr = array[x, y]
+        le_bstr_to_loc.append((bstr_as_le_int(bstr), (x, y)))
+        be_bstr_to_loc.append((bstr_as_be_int(bstr), (x, y)))
+    le_bstr_to_loc.sort()
+    be_bstr_to_loc.sort()
+    bits_to_coord_cache      = [xy for _, xy in be_bstr_to_loc]   # deepquantum is big endian
+    bits_to_coord_flip_cache = [xy for _, xy in le_bstr_to_loc]   # if we flip it, then it's little endian
+
+  for xy in (bits_to_coord_flip_cache if flip else bits_to_coord_cache):
+    yield xy
+
+def qam_reshape_norm_padding(x:Tensor, nbps:int=12, hwc_order:bool=False) -> Tensor:
+  has_batch = True
+  if x.dim() == 3:
+    x = x.unsqueeze(0)
+    has_batch = False
+  assert len(x.shape) == 4        # [B, C, H, W]
+  ''' NOTE: must arrange in PLANNAR fmt instead of PACKED!
+  三通道RGB拼贴为单通道大图，布局为：(原点在左下角，图在第一象限)
+    | R | O |  =>  ['10','00']
+    | B | G |  <=  ['11','01']
+  以满足后缀索引 (大端序)：
+    |...00> - 全0
+    |...10> - R
+    |...01> - G
+    |...11> - B
+  '''
+  null_channel = torch.zeros_like(x[:, 0, ...])   # [B, H=32, W=32]
+  ch_order = 'RGB0'           # 通道序列化顺序
+  if ch_order == '0RGB':      # 开头补0
+    x_ex = torch.cat([        # [B, H_ex=64, W_ex=64]
+      torch.cat([x[:, 0, ...], null_channel], dim=-1),
+      torch.cat([x[:, 2, ...], x[:, 1, ...]], dim=-1),
+    ], dim=1)
+  elif ch_order == 'RGB0':    # 末尾补0 (better!)
+    x_ex = torch.cat([
+      torch.cat([x[:, 1, ...], x[:, 0, ...]], dim=-1),
+      torch.cat([null_channel, x[:, 2, ...]], dim=-1),
+    ], dim=1)
+  assert len(x_ex.shape) == 3     # [B, H_ex, W_ex]
+  pixels = []
+  for i, j in qam_index_generator(nbps, flip=hwc_order):
+    pixels.append(x_ex[:, i, j])
+  x = torch.stack(pixels, -1)     # [B, H_ex*W_ex]
+  x = F.normalize(x, p=2, dim=-1)
+  #x = F.pad(x, (0, 2**nbps - x.size(-1)), mode='constant', value=0.0)
+  if not has_batch:
+    x = x.squeeze(0)
+  return x.to(torch.complex64)  # [B, D=256]
 
 def reshape_norm_padding(x:Tensor, use_hijack:bool=True) -> Tensor:
     # NOTE: 因为test脚本不能修改，所以需要在云评测时直接替换具体实现
@@ -64,91 +175,6 @@ def reshape_norm_padding(x:Tensor, use_hijack:bool=True) -> Tensor:
     x = F.pad(x, (0, PADDING_SIZE), mode='constant', value=0)
     x = x.to(torch.complex64)
     return x.unsqueeze(-1)  # (batch_size, 4096, 1)
-
-bits_to_coord_cache = None
-bits_to_coord_flip_cache = None
-def _make_bits_to_coord_cache(nbps:int=12):
-    ''' ↓↓↓ copy from https://github.com/NVlabs/sionna/blob/main/sionna/mapping.py '''
-    def pam_gray(b:int):
-        return (1-2*b[0]) * ((2**len(b[1:]) - pam_gray(b[1:])) if len(b)>1 else 1)
-    def qam(num_bits_per_symbol:int):
-        c = np.zeros([2**num_bits_per_symbol], dtype=np.complex64)
-        for i in range(0, 2**num_bits_per_symbol):
-            b = np.asarray(list(np.binary_repr(i,num_bits_per_symbol)), dtype=np.int16)
-            c[i] = pam_gray(b[0::2]) + 1j*pam_gray(b[1::2]) # PAM in each dimension
-        return c
-    ''' ↑↑↑ copy from https://github.com/NVlabs/sionna/blob/main/sionna/mapping.py '''
-
-    def le_to_be(idx:int) -> int:   # bit string little-endian to big endian in dec fmt
-        bstr = bin(idx)[2:].rjust(nbps, '0')
-        bstr_rev = bstr[::-1]
-        return int(bstr_rev, base=2)
-
-    # ref: https://nvlabs.github.io/sionna/examples/Hello_World.html
-    constellation = qam(nbps)   # 1024-QAM (32x32 pixels per channel)
-    bits_to_coord = np.asarray([(int(pt.real), int(pt.imag)) for pt in constellation], dtype=np.int32)
-    bits_to_coord -= bits_to_coord.min()
-    bits_to_coord //= 2
-    bits_to_coord_flip = [(le_to_be(i), xy) for i, xy in enumerate(bits_to_coord)]
-    bits_to_coord_flip.sort()
-    bits_to_coord_flip = [xy for _, xy in bits_to_coord_flip]   # chw -> hwc
-    global bits_to_coord_cache, bits_to_coord_flip_cache
-    bits_to_coord_cache = bits_to_coord
-    bits_to_coord_flip_cache = bits_to_coord_flip
-
-def qam_index_generator(nbps:int=12, flip:bool=True) -> Generator[Tuple[int, int], int, None]:
-    if bits_to_coord_cache is None:
-        _make_bits_to_coord_cache(nbps)
-    for xy in (bits_to_coord_flip_cache if flip else bits_to_coord_cache):
-        yield xy
-
-def qam_reshape_norm_padding(x:Tensor, hwc_order:bool=True) -> Tensor:
-    has_batch = True
-    if x.dim() == 3:
-        x = x.unsqueeze(0)
-        has_batch = False
-    assert len(x.shape) == 4        # [B, C, H, W]
-    ''' NOTE: must arrange in PLANNAR fmt instead of PACKED!
-    三通道RGB拼贴为单通道大图，布局为：
-      | B | R |
-      | 0 | G |
-    以满足后缀索引 (大端序)：
-      |...00> - G
-      |...10> - G
-      |...01> - B
-      |...11> - 全0
-    '''
-    null_channel = torch.zeros_like(x[:, 0, ...])   # [B, H=32, W=32]
-    x_ex = torch.cat([              # [B, H_ex=64, W_ex=64]，魔法顺序！ :(
-        torch.cat([x[:, 2, ...], null_channel], dim=-1),
-        torch.cat([x[:, 0, ...], x[:, 1, ...]], dim=-1),
-    ], dim=1)
-    assert len(x_ex.shape) == 3     # [B, H_ex, W_ex]
-    pixels = []
-    for i, j in qam_index_generator(flip=hwc_order):
-        pixels.append(x_ex[:, i, j])
-    x = torch.stack(pixels, -1)     # [B, H_ex*W_ex]
-    x = F.normalize(x, p=2, dim=-1)
-    x = F.pad(x, (1, 4096 - x.size(1) - 1), mode='constant', value=0.0)
-    if not has_batch:
-        x = x.squeeze(0)
-    return x.to(torch.complex64)    # [B, D=4096]
-
-
-def get_fidelity(state_pred, state_true):
-    # state_pred, state_true: (batch_size, 4096, 1)
-    state_pred = state_pred.view(-1, 4096).real
-    state_true = state_true.view(-1, 4096).real
-    fidelity = (state_pred * state_true).sum(-1)**2
-    return fidelity.mean()
-
-
-@torch.inference_mode
-def get_acc(y_pred, y_true):
-    # 计算准确率
-    correct = (y_pred == y_true).float()
-    accuracy = correct.sum() / len(correct)
-    return accuracy.item()
 
 
 # 将数据的平均值调整为接近0 大部分像素值会落在[-1, 1]范围内
@@ -272,19 +298,15 @@ def encode_single_data(data, debug:bool=False):
     global is_show_gate_count
     image, label = data     # [3, 32, 32], []
 
-    # std flatten:
-    # [n_rep=1] fid=0.930, gcnt=79, timecost=1324s; n_iter=500, n_worker=8
-    # [n_rep=2] fid=0.954, gcnt=157, timecost=620s; n_iter=100, n_worker=8
-    # [n_rep=3] fid=0.965, gcnt=235, timecost=836s; n_iter=100, n_worker=8
     # qam flatten:
-    # [n_rep=1] fid=0.906, gcnt=79, timecost=1082s; n_iter=500, n_worker=16
-    # qam flatten (hwc order):
-    # [n_rep=1] fid=0.935, gcnt=79, timecost=457s; n_iter=200, n_worker=16
+    # [n_rep=1] fid=0.910, gcnt=79,  timecost=447s; n_iter=200, n_worker=16
+    # [n_rep=2] fid=0.949, gcnt=157, timecost=853s; n_iter=200, n_worker=16
     def vqc_F1_all_wise_init_0(nq:int=12, n_rep:int=1):
-        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        ''' RY(single init) - [pairwise(F1) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)
         g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
-        g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+        #g.init_para([np.pi/2])
+        g.init_para([2.4619188346815495])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
         vqc.add(g)
         for _ in range(n_rep):
             for i in range(nq-1):   # qubit order
@@ -299,15 +321,17 @@ def encode_single_data(data, debug:bool=False):
         return vqc
 
     # qam flatten:
-    # [n_rep=1] fid=0.946, gcnt=145, timecost=851s; n_iter=200, n_worker=16
-    # [n_rep=2] fid=0.961, gcnt=289, timecost=1565s; n_iter=200, n_worker=16
+    # [n_rep=1] fid=0.956, gcnt=145, timecost=795s; n_iter=200, n_worker=16
+    # [n_rep=1] fid=0.959, gcnt=145, timecost=1947s; n_iter=500, n_worker=16
+    # [n_rep=2] fid=0.973, gcnt=289, timecost=1573s; n_iter=200, n_worker=16
     # qam flatten (hwc order):
-    # [n_rep=1] fid=0.952, gcnt=145, timecost=805s; n_iter=200, n_worker=16
+    # [n_rep=1] fid=0.951, gcnt=145, timecost=795s; n_iter=200, n_worker=16
     def vqc_F2_all_wise_init_0(nq:int=12, n_rep:int=1):
         ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)
         g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
-        g.init_para([np.pi/2])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+        #g.init_para([np.pi/2])
+        g.init_para([2.4619188346815495])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
         vqc.add(g)
         for _ in range(n_rep):
             for i in range(nq-1):   # qubit order
@@ -324,34 +348,8 @@ def encode_single_data(data, debug:bool=False):
                 vqc.add(g)
         return vqc
 
-    # qam flatten:
-    # [n_rep=1] fid=NaN, gcnt=171, timecost=NaN; n_iter=200, n_worker=16
-    def vqc_F1_all_wise_init_0_specialize_channel_qubits(nq:int=12, n_rep:int=None):
-        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
-        ''' 考虑到 qam flatten 排列下 |x11> 是全0，而 |x00> |x10> |x01> 是大致相似的，我们特殊处理代表 channel 意义的 2 个比特；几乎能做到 |x11> 拟合到全0，但是其他地方拟合不好 '''
-        vqc = dq.QubitCircuit(nqubit=nq)
-        # the channel qubits 0~1 is the main 1/3 weight distributor
-        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)             ; g.init_para([np.pi])   ; vqc.add(g)
-        g = dq.Ry(nqubit=nq, wires=1, controls=0, requires_grad=True) ; g.init_para([np.pi/2]) ; vqc.add(g)
-        g = dq.Ry(nqubit=nq, wires=0, controls=1, requires_grad=True) ; g.init_para([np.pi/2]) ; vqc.add(g)
-        # the spatial qubits 2~12 is the evil, handle each channel
-        def add_F1_seg():
-            for i in range(2, nq-1):   # qubit order
-                for j in range(i+1, nq):
-                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
-                    g.init_para([0.0])
-                    vqc.add(g)
-            for i in range(2, nq):
-                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
-                g.init_para([0.0])
-                vqc.add(g)
-        vqc.x(wires=1) ; add_F1_seg()   # |x10>
-        vqc.x(wires=0) ; add_F1_seg()   # |x11>
-        vqc.x(wires=1) ; add_F1_seg()   # |x01>
-        return vqc
-
-    n_iter = 200
-    encoding_circuit = vqc_F1_all_wise_init_0(12, 1)
+    n_iter = 500
+    encoding_circuit = vqc_F2_all_wise_init_0(12, 1)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
         is_show_gate_count = False
@@ -364,10 +362,10 @@ def encode_single_data(data, debug:bool=False):
     for _ in range(n_iter):
         state = encoding_circuit().unsqueeze(0)
         loss = -get_fidelity(state, target)
-        loss_list.append(loss.item())
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        if debug: loss_list.append(loss.item())
     if debug:
         tht0 = encoding_circuit.operators[0].theta
         print('tht0:', tht0.item())
@@ -378,7 +376,6 @@ def encode_single_data(data, debug:bool=False):
         plt.plot(target        .real.flatten(), 'b', label='target')
         plt.plot(state.detach().real.flatten(), 'r', label='state')
         plt.legend()
-        plt.title('values')
         plt.tight_layout()
         plt.show()
         breakpoint()
