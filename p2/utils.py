@@ -285,10 +285,7 @@ class PerfectAmplitudeEncodingDataset(Dataset):
         return len(self.quantum_dataset)
 
     def __getitem__(self, idx):
-        x = self.quantum_dataset[idx][0]
-        y = self.quantum_dataset[idx][1]
-        z = self.quantum_dataset[idx][2]
-        return x, y, z
+        return self.quantum_dataset[idx]
 
 
 # 注意: 决赛的数据集名字必须固定为 QCIFAR10Dataset

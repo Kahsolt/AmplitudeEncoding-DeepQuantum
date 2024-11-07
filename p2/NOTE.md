@@ -62,7 +62,7 @@ Accuracy: 0.420
 | vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm, n_iter=500 (⭐) |
 | vqc_F2_all_wise_init_0 | 2 | 289 | 0.973 | 2.8015 | no_data_norm |
 | vqc_F2_all_wise_init_0 | 1 | 145 | 0.951 | 2.8295 | no_data_norm, hwc order |
-[Local 2]
+[Local 2] (暂用基线clf，qcnn过拟合了更烂)
 classifier gate count: 14400
 test fid: 0.959
 test acc: 0.420

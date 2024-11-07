@@ -1,6 +1,7 @@
 import os
 import random
 from collections import Counter
+from typing import List
 
 import torch
 import torch.nn as nn
@@ -38,7 +39,7 @@ class QuantumNeuralNetwork(nn.Module):
         """构建变分量子线路"""
 
         # n_layer=600, gcnt=14400, pcnt=7200
-        if 'baseline':
+        if not 'baseline':
             for i in range(self.num_layers):
                 self.var_circuit.rylayer()
                 self.var_circuit.cnot_ring()
@@ -96,6 +97,59 @@ class QuantumNeuralNetwork(nn.Module):
             self.var_circuit.observable(wires=2, basis='z')
             self.var_circuit.observable(wires=3, basis='z')
             self.var_circuit.observable(wires=4, basis='z')
+
+        # n_layer=10, gcnt=2230, pcnt=3030; acc=43%
+        # n_layer=30, gcnt=6612, pcnt=9012; acc=43% (wtf?)
+        if 'qcnn':
+            vqc = self.var_circuit
+
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=2
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wire_p1, wires):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                # layer1
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9) ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9) ; add_V(10, 11)
+                # layer2
+                add_U(1, 3) ; add_U(5, 7) ; add_U(9, 11)
+                add_U(3, 5) ; add_U(7, 9)
+                add_V(3, 5) ; add_V(7, 9)
+                # layer3
+                add_U(3, 7) ; add_V(3, 7)
+                add_U(7, 11) ; add_V(7, 11)
+            # fc
+            add_F([7, 11])
+            # meas
+            vqc.observable(7,  basis='z')
+            vqc.observable(7,  basis='x')
+            vqc.observable(7,  basis='y')
+            vqc.observable(11, basis='z')
+            vqc.observable(11, basis='x')
 
         print('classifier gate count:', count_gates(self.var_circuit))
 
