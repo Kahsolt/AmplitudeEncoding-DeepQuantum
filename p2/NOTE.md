@@ -40,19 +40,19 @@ runtime:    15.163 /  15.341  /  15.272
 | vqc_F2_all_wise_init_0 | 2 | 289 | 0.961 | 2.7775 | no_data_norm |
 | vqc_F1_all_wise_init_0 | 1 |  79 | 0.935 | 2.8305 | no_data_norm, hwc order |
 | vqc_F2_all_wise_init_0 | 1 | 145 | 0.952 | 2.8315 | no_data_norm, hwc order (⭐) |
-[Local 1]
-classifier gate count: 14400
-test fid: 0.952
-test acc: 0.420
-test gates: 145.000
-runtime: 15.296
-客观得分: 334.770
-[Submit 1]
-Fidelity: 0.952
-Accuracy: 0.420
-振幅编码线路门的个数: 145.0
-运行时间: 5.347104549407959
-客观得分: 335.0461788574855
+[Local]
+  classifier gate count: 14400
+  test fid: 0.952
+  test acc: 0.420
+  test gates: 145.000
+  runtime: 15.296
+  客观得分: 334.770
+[Submit]
+  Fidelity: 0.952
+  Accuracy: 0.420
+  振幅编码线路门的个数: 145.0
+  运行时间: 5.347104549407959
+  客观得分: 335.0461788574855
 
 [Trail 2] qam_flatten (optimize & bugfix)
 | encoder | n_layer | gate count | fidelity | score | comment |
@@ -62,13 +62,13 @@ Accuracy: 0.420
 | vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm, n_iter=500 (⭐) |
 | vqc_F2_all_wise_init_0 | 2 | 289 | 0.973 | 2.8015 | no_data_norm |
 | vqc_F2_all_wise_init_0 | 1 | 145 | 0.951 | 2.8295 | no_data_norm, hwc order |
-[Local 2] (暂用基线clf，qcnn过拟合了更烂)
-classifier gate count: 14400
-test fid: 0.959
-test acc: 0.420
-test gates: 145.000
-runtime: 15.562
-客观得分: 336.131
+[Local] (暂用基线clf，qcnn过拟合了更烂)
+  classifier gate count: 14400
+  test fid: 0.959
+  test acc: 0.420
+  test gates: 145.000
+  runtime: 15.562
+  客观得分: 336.131
 
 [Trail 3] std_flatten + data_norm (we'are fucking back!)
 | encoder | n_layer | gate count | fidelity | score | comment |
@@ -76,6 +76,22 @@ runtime: 15.562
 | vqc_F2_all_wise_init_0 | 2 | 289 | 0.919 | 2.6935 | data_norm |
 😈 分类模型使用 qcnn，离奇的是训练时验证集精度仍然在 42% 左右，测试精度 39.4%
 难道任何 ansatz 结构无论在 std 还是 qam 展开方式下，最高精度都突破不了这个神秘数字 42%??
+
+[Trail 4] qam_flatten
+使用 F2_all 作分类器，使用 best_acc 检查点；相比基线减少了门数量，精度依然在瓶颈 42% 处
+[Local]
+  classifier gate count: 1452
+  test fid: 0.959 (qam_flatten + F2 layer=2)
+  test acc: 0.420 (F2 + best acc ckpt)
+  test gates: 145.000
+  runtime: 3.161
+  客观得分: 336.476
+[Submit]
+  Fidelity: 0.959
+  Accuracy: 0.420
+  振幅编码线路门的个数: 145.0
+  运行时间: 1.098531723022461
+  客观得分: 336.5330392784543
 ```
 
 

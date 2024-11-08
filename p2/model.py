@@ -100,7 +100,7 @@ class QuantumNeuralNetwork(nn.Module):
 
         # n_layer=10, gcnt=2230, pcnt=3030; acc=43%
         # n_layer=30, gcnt=6612, pcnt=9012; acc=43% (wtf?)
-        if 'qcnn':
+        if not 'qcnn':
             vqc = self.var_circuit
 
             def add_U(i:int, j:int):  # conv
@@ -150,6 +150,36 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(7,  basis='y')
             vqc.observable(11, basis='z')
             vqc.observable(11, basis='x')
+
+        # n_layer=10, gcnt=1452, pcnt=1452; acc=39.486%/45.867% (test: 42%)
+        if 'F2_all_0':
+            ''' RY - [pairwise(F2) - RY], param zero init '''
+            vqc = self.var_circuit
+            nq = self.num_qubits
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
+            for _ in range(self.num_layers):
+                for i in range(nq-1):   # qubit order
+                    for j in range(i+1, nq):
+                        g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                        g.init_para([0.0])
+                        vqc.add(g)
+                        g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                        g.init_para([0.0])
+                        vqc.add(g)
+                for i in range(nq):
+                    g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+
+            # meas
+            vqc.observable(1,  basis='z')
+            vqc.observable(3,  basis='z')
+            vqc.observable(7,  basis='z')
+            vqc.observable(9,  basis='z')
+            vqc.observable(11, basis='z')
 
         print('classifier gate count:', count_gates(self.var_circuit))
 

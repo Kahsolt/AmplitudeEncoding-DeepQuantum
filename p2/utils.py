@@ -155,7 +155,7 @@ def qam_reshape_norm_padding(x:Tensor, nbps:int=12, hwc_order:bool=False) -> Ten
     x = x.squeeze(0)
   return x.to(torch.complex64)  # [B, D=256]
 
-def reshape_norm_padding(x:Tensor, use_hijack:bool=False) -> Tensor:
+def reshape_norm_padding(x:Tensor, use_hijack:bool=True) -> Tensor:
     # NOTE: 因为test脚本不能修改，所以需要在云评测时直接替换具体实现
     if use_hijack:
         return qam_reshape_norm_padding(x)
@@ -190,7 +190,7 @@ cifar10_transforms = T.Compose([
     # use this instead :)
     #T.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     # This is 5-class stats on trainset
-    T.Normalize((0.4903, 0.4873, 0.4642), (0.2519, 0.2498, 0.2657)),
+    #T.Normalize((0.4903, 0.4873, 0.4642), (0.2519, 0.2498, 0.2657)),
 ])
 
 
@@ -348,7 +348,7 @@ def encode_single_data(data, debug:bool=False):
                 vqc.add(g)
         return vqc
 
-    n_iter = 200
+    n_iter = 500
     encoding_circuit = vqc_F2_all_wise_init_0(12, 1)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
