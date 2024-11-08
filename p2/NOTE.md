@@ -69,6 +69,13 @@ test acc: 0.420
 test gates: 145.000
 runtime: 15.562
 客观得分: 336.131
+
+[Trail 3] std_flatten + data_norm (we'are fucking back!)
+| encoder | n_layer | gate count | fidelity | score | comment |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.846 | 2.6195 | data_norm |
+| vqc_F2_all_wise_init_0 | 2 | 289 | 0.919 | 2.6935 | data_norm |
+😈 分类模型使用 qcnn，离奇的是训练时验证集精度仍然在 42% 左右，测试精度 39.4%
+难道任何 ansatz 结构无论在 std 还是 qam 展开方式下，最高精度都突破不了这个神秘数字 42%??
 ```
 
 
