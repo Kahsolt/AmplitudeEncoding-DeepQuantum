@@ -92,6 +92,22 @@ runtime:    15.163 /  15.341  /  15.272
   振幅编码线路门的个数: 145.0
   运行时间: 1.098531723022461
   客观得分: 336.5330392784543
+
+[Trail 4] qam_flatten (overfit!)
+[Local]
+  classifier gate count: 1452
+  test fid: 0.959
+  test acc: 0.424
+  test gates: 145.000
+  runtime: 3.118
+  客观得分: 336.877
+[Submit]
+  classifier gate count: 1452
+  Fidelity: 0.959
+  Accuracy: 0.424
+  振幅编码线路门的个数: 145.0
+  运行时间: 1.0803706645965576
+  客观得分: 336.9335445629226
 ```
 
 

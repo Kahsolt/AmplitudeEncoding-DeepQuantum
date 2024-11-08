@@ -184,11 +184,9 @@ def train_model(model:nn.Module, optimizer:optim.Optimizer, train_loader:DataLoa
 
   os.makedirs(output_dir, exist_ok=True)
   save_path = os.path.join(output_dir, "best_model.pt")
-  save_acc_path = os.path.join(output_dir, "best_model.acc.pt")
   history_path = os.path.join(output_dir, "loss_history.json")
   fig_path = os.path.join(output_dir, "loss_acc.png")
 
-  best_valid_loss = float('inf')
   best_valid_acc = 0.0
   history = {
     'train_loss': [], 
@@ -244,9 +242,6 @@ def train_model(model:nn.Module, optimizer:optim.Optimizer, train_loader:DataLoa
 
     if valid_acc > best_valid_acc:
       best_valid_acc = valid_acc
-      torch.save(model.state_dict(), save_acc_path)
-    if valid_loss < best_valid_loss: 
-      best_valid_loss = valid_loss
       torch.save(model.state_dict(), save_path)
 
   plt.clf()

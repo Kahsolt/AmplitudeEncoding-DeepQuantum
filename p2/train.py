@@ -13,6 +13,7 @@ from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import DataLoader, random_split
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from model import QuantumNeuralNetwork
 from utils import QCIFAR10Dataset, PerfectAmplitudeEncodingDataset
@@ -29,7 +30,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 
-def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  output_dir, patience=10, device='cpu'):
+def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  output_dir, device='cpu'):
     """
     Train and validate the model, implementing early stopping based on validation loss.
     The best model is saved, along with the loss history after each epoch and gradient norms.
@@ -60,10 +61,9 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
         shutil.copy(file, output_src_dir)
 
     save_path = os.path.join(output_dir, "best_model.pt")
-    save_acc_path = os.path.join(output_dir, "best_model.acc.pt")
     history_path = os.path.join(output_dir, "loss_history.json")
+    fig_path = os.path.join(output_dir, "loss_acc.png")
     pbar = tqdm(total=num_epochs * len(train_loader), position=0, leave=True)
-    best_valid_loss = float('inf')
     best_valid_acc = 0.0
     history = {
         'train_loss': [], 
@@ -71,7 +71,6 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
         'train_acc': [], 
         'valid_acc': [],
     }
-    epochs_no_improve = 0  # Counter for epochs with no improvement in validation loss
 
     for epoch in range(num_epochs):
         ''' Train '''
@@ -120,22 +119,18 @@ def train_model(model, optimizer, train_loader, valid_loader, num_epochs,  outpu
         if valid_acc > best_valid_acc:
             best_valid_acc = valid_acc
             print('>> save new best_acc ckpt')
-            torch.save(model.state_dict(), save_acc_path)
-            epochs_no_improve = 0
-
-        if valid_loss < best_valid_loss - 0.003: 
-            best_valid_loss = valid_loss
-            print('')
             torch.save(model.state_dict(), save_path)
-            epochs_no_improve = 0  # Reset the counter since we have improvement
-        else:
-            epochs_no_improve += 1  # Increment the counter when no improvement
-
-        if epochs_no_improve >= patience:
-            tqdm.write("Early stopping triggered.")
-            break  # Break out of the loop if no improvement for 'patience' number of epochs
 
     pbar.close()
+
+    plt.clf()
+    plt.plot(history['train_loss'], 'dodgerblue', label='train_loss')
+    plt.plot(history['valid_loss'], 'orange',     label='valid_loss')
+    ax = plt.twinx()
+    ax.plot(history['train_acc'], 'b', label='train_acc')
+    ax.plot(history['valid_acc'], 'r', label='valid_acc')
+    plt.savefig(fig_path, dpi=400)
+    plt.close()
 
 
 if __name__ == '__main__':
@@ -143,17 +138,22 @@ if __name__ == '__main__':
     DEVICE = "cuda:0"
     BATCH_SIZE = 32 # todo: 修改为合适的配置
     NUM_EPOCHS = 30 
-    PATIENCE = 5 # if PATIENCE与NUM_EPOCHS相等，则不会触发early stopping
     OUTPUT_DIR  = 'output'
 
-    dataset = PerfectAmplitudeEncodingDataset(train=True, size=2500) # todo: 修改为合适的配置
-    print('dataset labels:', Counter(sample[1].item() for sample in dataset))
-    train_size = int(0.7 * len(dataset))
-    valid_size = len(dataset) - train_size
-    train_dataset, valid_dataset = random_split(dataset, [train_size, valid_size])
-    # 构建数据加载器，用于加载训练和验证数据
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    if 'test overfit':      # 实验性地过拟合测试集，使用编码数据
+        with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as fh:
+            dataset = pickle.load(fh)
+        train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True,  drop_last=True)
+        valid_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, drop_last=False)
+    else:
+        dataset = PerfectAmplitudeEncodingDataset(train=True, size=2500) # todo: 修改为合适的配置
+        print('dataset labels:', Counter(sample[1].item() for sample in dataset))
+        train_size = int(0.7 * len(dataset))
+        valid_size = len(dataset) - train_size
+        train_dataset, valid_dataset = random_split(dataset, [train_size, valid_size])
+        # 构建数据加载器，用于加载训练和验证数据
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True,  drop_last=True)
+        valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False, drop_last=False)
 
     '''
     赛方给定的基线表现：
@@ -233,7 +233,6 @@ if __name__ == '__main__':
         num_epochs=NUM_EPOCHS, 
         output_dir=OUTPUT_DIR,
         device=DEVICE,
-        patience=PATIENCE,
     )
     ts_end = time()
     print('>> train clf_model time cost:', ts_end - ts_start)   # 5531s
