@@ -175,3 +175,9 @@ $$
 | cnn_nano         |        44 | 35.4% | 底线，不应该比这个差 |
 | knn              |           | 64.9% | k=5, p=1 |
 | rf               |           | 65.5% | |
+
+
+#### reference
+
+- (Quanvolution) https://github.com/anthonysmaldone/qcnn-multi-channel-supervised-learning
+- (Hybrid) https://github.com/DRA-chaos/Quantum-Classical-Hyrid-Neural-Network-for-binary-image-classification-using-PyTorch-Qiskit-pipeline
