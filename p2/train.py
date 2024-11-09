@@ -140,7 +140,7 @@ if __name__ == '__main__':
     NUM_EPOCHS = 30 
     OUTPUT_DIR  = 'output'
 
-    if 'test overfit':      # 实验性地过拟合测试集，使用编码数据
+    if not 'test overfit':      # 实验性地过拟合测试集，使用编码数据
         with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as fh:
             dataset = pickle.load(fh)
         train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True,  drop_last=True)
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     Epoch 17/30 - Train loss: 1.4880423, Train acc: 44.629%, Valid loss: 1.4902040, Valid acc: 42.400%
     '''
     # 创建一个量子神经网络模型
-    model_config = {'num_qubits': 12, 'num_layers': 24} # todo: 修改为合适的配置
+    model_config = {'num_qubits': 12, 'num_layers': 10} # todo: 修改为合适的配置
     model = QuantumNeuralNetwork(**model_config)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 

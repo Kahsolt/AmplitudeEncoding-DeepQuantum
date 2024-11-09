@@ -131,6 +131,23 @@ runtime:    15.163 /  15.341  /  15.272
   振幅编码线路门的个数: 145.0
   运行时间: 3.3697571754455566
   客观得分: 338.86995156606037
+
+[Trail 5] no_data_norm + std_flatten (overfit!)
+enc:
+  | encoder | n_layer | gate count | fidelity | score | comment |
+  | vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm, std_flatten, n_iter=500 |
+  | vqc_F2_all_wise_init_0 | 1 | 145 | 0.966 | 2.8595 | no_data_norm, std_flatten, n_iter=500 |
+clf:
+  | vqc | acc |
+  | qcnn     (nlayer=8)  | 42.8% |
+  | F2_all_0 (nlayer=10) | 34.0% |
+[Local]
+  classifier gate count: 1772
+  test fid: 0.966
+  test acc: 0.428
+  test gates: 145.000
+  runtime: 3.512
+  客观得分: 338.730
 ```
 
 
@@ -143,7 +160,7 @@ $$ \text{Use} \ \left| x \right> = \frac{x}{\lvert| x \rvert|} \ \text{or} \ \le
 | 分布 | 不对称            | 比较对称，均值0 | |
 | 符号 | 恒正，无需学习相位 | 有正有负，需要学习相位 | |
 | enc  | fid=0.954         | fid=0.70    | vqc_F1_all_wise_init_0(d=2) |
-| clf  | acc=?             | acc=46.667% | baseline |
+| clf  | acc=~42%          | acc=46.667% | baseline |
 
 规范化数据の内积，`sqrt(保真度/余弦相似度)`:
 
@@ -173,8 +190,9 @@ $$
 | cnn_d1_s2_x16_L  |        74 | 46.2% | 图太小时，激活函数可忽略 |
 | cnn_d1_s2_x16_nb |        74 | 45.6% | 极端压缩，仍然高于基线 QNN |
 | cnn_nano         |        44 | 35.4% | 底线，不应该比这个差 |
+| mlp0             |         - | 53.2%/67.6% | 模拟纯 ansatz 方法! 😈 |
 | mlp1             |     15365 | 57.2% | 线性模型参考标准 ⭐ |
-| mlp1_nb          |     15365 | 56.6% | 直接线路合成??! 不行，因为不一定是酉阵 😈 |
+| mlp1_nb          |     15365 | 56.6% | wtm 直接线路合成??! 参考 mlp0 方法 |
 | mlp2             |    787973 | 64.2% | 激活函数重要 |
 | mlp2_drop        |    787973 | 63.2% | p=0.5 |
 | mlp3             |   3410437 | 62.8% | 过拟合了 |
@@ -183,8 +201,25 @@ $$
 
 结论:
 
-- 无偏置无激活的线性模型精度为 `56.6%`，任何单纯 ansatz 方法不应突破这个数字，因酉矩阵的数学本质仅能做十分有限的线性变换
-- 无偏置无激活的极简三层 CNN 精度为 `52.4%`，精度稍欠但参数量确实少
+- 无偏置无激活的极简卷积模型 `cnn_d1_s2_nb` 精度为 `52.4%`，精度稍欠但参数量确实少
+- 无偏置无激活的极简线性模型 `mlp1_nb` 精度为 `56.6%`
+  - 模拟纯 ansatz 方法 `mlp0` 精度为 `53.2%`，任何单纯 ansatz 方法不应突破这个数字...
+  - 在配置 `data_norm + std_flatten` 下可以达到精度 `57.8%`!! 我们真的还需要 qam_flatten 吗??
+- **卷积模型不如线性模型那样容易在 circuit 上实现**
+
+⚪ 理想模拟结果
+
+| settings | amp_enc fid/gcnt actual | `mlp0` acc expected | maximun score expected |
+| :-: | :-: | :-: | :-: |
+|    data_norm + std_flatten |           | 57.8% |  |
+|    data_norm + qam_flatten |           | 57.6% |  |
+| no_data_norm + std_flatten | 0.966/145 | 53.2% | 3.3915 |
+| no_data_norm + qam_flatten | 0.959/145 | 52.8% | 3.3735 |
+
+讨论:
+
+- flatten 方式不太改变线性模型的精度，甚至我们根本不需要 qam_flatten 呜呜呜。。。 :(
+- 但 data_norm 确实很影响编码保真度
 
 
 #### reference

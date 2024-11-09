@@ -155,7 +155,7 @@ def qam_reshape_norm_padding(x:Tensor, nbps:int=12, hwc_order:bool=False) -> Ten
     x = x.squeeze(0)
   return x.to(torch.complex64)  # [B, D=256]
 
-def reshape_norm_padding(x:Tensor, use_hijack:bool=True) -> Tensor:
+def reshape_norm_padding(x:Tensor, use_hijack:bool=False) -> Tensor:
     # NOTE: 因为test脚本不能修改，所以需要在云评测时直接替换具体实现
     if use_hijack:
         return qam_reshape_norm_padding(x)
@@ -317,9 +317,11 @@ def encode_single_data(data, debug:bool=False):
                 vqc.add(g)
         return vqc
 
-    # std flatten:
+    # std flatten (+data_norm):
     # [n_rep=1] fid=0.846, gcnt=145, timecost=869s; n_iter=200, n_worker=16
     # [n_rep=2] fid=0.919, gcnt=289, timecost=1699s; n_iter=200, n_worker=16
+    # std flatten:
+    # [n_rep=1] fid=0.966, gcnt=145, timecost=2131s; n_iter=500, n_worker=16
     # qam flatten:
     # [n_rep=1] fid=0.956, gcnt=145, timecost=795s; n_iter=200, n_worker=16
     # [n_rep=1] fid=0.959, gcnt=145, timecost=1947s; n_iter=500, n_worker=16

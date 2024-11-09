@@ -66,6 +66,53 @@ def train(model:nn.Module, trainloader:DataLoader, testloader:DataLoader) -> flo
   plt.close()
 
 
+def get_model_mlp0():     # 模拟任意 ansatz 方法
+  I = torch.tensor([
+    [1, 0],
+    [0, 1],
+  ], device=device, dtype=torch.float32)
+  X = torch.tensor([
+    [0, 1],
+    [1, 0],
+  ], device=device, dtype=torch.float32)
+  Z = torch.tensor([
+    [1, 0],
+    [0, -1],
+  ], device=device, dtype=torch.float32)
+  term_to_gate = {
+    'I': I,
+    'X': X,
+    'Z': Z,
+  }
+  def get_pauli_unitary(s:str):
+    u = term_to_gate[s[0]]
+    for c in s[1:]:
+      u = torch.kron(term_to_gate[c], u)
+    return u
+
+  class MLP0(nn.Module):
+    def __init__(self):
+      super().__init__()
+      # 假设该矩阵可以被 QR 分解，其中矩阵 Q 即某 ansatz 所对应酉阵 U
+      self.U_holder = nn.Parameter(torch.eye(4096, device=device, requires_grad=True))
+      self.meas = [
+        get_pauli_unitary('ZIIIIIIIIIII'),    # Z0
+        get_pauli_unitary('IZIIIIIIIIII'),    # Z1
+        get_pauli_unitary('IIZIIIIIIIII'),    # Z2
+        get_pauli_unitary('IIIZIIIIIIII'),    # Z3
+        get_pauli_unitary('IIIIZIIIIIII'),    # Z4
+      ]
+    def forward(self, x):
+      x = x.squeeze(-1)   # in case of std_flat
+      U, _ = torch.linalg.qr(self.U_holder, mode='complete')
+      out = x @ U         # [B, D=4096], qstate
+      res = []
+      for H in self.meas:     # simulate expval(), i.e. <ψ|H|ψ>
+        r = out @ H @ out.T
+        res.append(r.diag())
+      return torch.stack(res, dim=-1)
+  return MLP0()
+
 def get_model_mlp1():
   class MLP1(nn.Module):
     def __init__(self):
@@ -77,7 +124,7 @@ def get_model_mlp1():
       return self.mlp(x[:, :3072])
   return MLP1()
 
-def get_model_mlp1_nb():
+def get_model_mlp1_nb():  # 纯 ansatz 方法的理论上限
   class MLP1_nb(nn.Module):
     def __init__(self):
       super().__init__()
@@ -132,7 +179,7 @@ def get_model_mlp3():
 
 
 #model_getters = [v for k, v in globals().items() if k.startswith('get_model')]
-model_getters = [get_model_mlp1_nb]  # 纯 ansatz 方法的理论上限
+model_getters = [get_model_mlp0]
 
 
 trainset = PerfectAmplitudeEncodingDataset(train=True, size=2500)

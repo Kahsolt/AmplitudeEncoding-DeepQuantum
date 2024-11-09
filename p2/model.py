@@ -154,10 +154,13 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(11, basis='z')
             vqc.observable(11, basis='x')
 
+        # [std_flatten]
+        # n_layer=24, gcnt=5292, pcnt=1524; best overfit acc=42.8%
+        # [qam_flatten]
         # n_layer=8,  gcnt=1772, pcnt=516;  best overfit acc=38.6%
         # n_layer=12, gcnt=2652, pcnt=768;  best overfit acc=41.0%
         # n_layer=24, gcnt=5292, pcnt=1524; best overfit acc=44.4%
-        if 'real qcnn (3 blocks)':     # parameter shared!
+        if not 'real qcnn (3 blocks)':     # parameter shared!
             def mk_U_gates() -> List[Gate]:
                 return [
                     dq.U3Gate(nqubit=self.num_qubits, requires_grad=True),
@@ -375,8 +378,11 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(9,  basis='z')
             vqc.observable(3,  basis='x')
 
+        # [std_flatten]
+        # n_layer=10, gcnt=1452, pcnt=1452; best overfit acc=34.0%
+        # [qam_flatten(?)]
         # n_layer=10, gcnt=1452, pcnt=1452; acc=39.486%/45.867% (test: 42%)
-        if not 'F2_all_0':
+        if 'F2_all_0':
             ''' RY - [pairwise(F2) - RY], param zero init '''
             nq = self.num_qubits
             for i in range(nq):
@@ -397,11 +403,11 @@ class QuantumNeuralNetwork(nn.Module):
                     g.init_para([0.0])
                     vqc.add(g)
             # meas
-            vqc.observable(1,  basis='z')
-            vqc.observable(3,  basis='z')
-            vqc.observable(7,  basis='z')
-            vqc.observable(9,  basis='z')
-            vqc.observable(11, basis='z')
+            vqc.observable(0, basis='z')
+            vqc.observable(1, basis='z')
+            vqc.observable(2, basis='z')
+            vqc.observable(3, basis='z')
+            vqc.observable(4, basis='z')
 
         print('classifier gate count:', count_gates(vqc))
 
