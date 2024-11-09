@@ -108,6 +108,13 @@ runtime:    15.163 /  15.341  /  15.272
   test gates: 145.000
   runtime: 4.231
   客观得分: 337.446
+-----------------------
+  classifier gate count: 5292 (real qcnn nlayer=24)
+  test fid: 0.959
+  test acc: 0.444
+  test gates: 145.000
+  runtime: 9.898
+  客观得分: 338.689
 [Submit]
   classifier gate count: 1452 (F2_all nlayer=10)
   Fidelity: 0.959
@@ -116,7 +123,14 @@ runtime:    15.163 /  15.341  /  15.272
   运行时间: 1.0803706645965576
   客观得分: 336.9335445629226
 -----------------------
-
+  xxx
+-----------------------
+  classifier gate count: 5292
+  Fidelity: 0.959
+  Accuracy: 0.444
+  振幅编码线路门的个数: 145.0
+  运行时间: 3.3697571754455566
+  客观得分: 338.86995156606037
 ```
 
 
