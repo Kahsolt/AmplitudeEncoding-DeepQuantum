@@ -98,9 +98,10 @@ class QuantumNeuralNetwork(nn.Module):
             self.var_circuit.observable(wires=3, basis='z')
             self.var_circuit.observable(wires=4, basis='z')
 
+        # n_layer=8,  gcnt=1772, pcnt=2412; acc=43%
         # n_layer=10, gcnt=2230, pcnt=3030; acc=43%
         # n_layer=30, gcnt=6612, pcnt=9012; acc=43% (wtf?)
-        if not 'qcnn':
+        if 'qcnn':
             vqc = self.var_circuit
 
             def add_U(i:int, j:int):  # conv
@@ -152,7 +153,7 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(11, basis='x')
 
         # n_layer=10, gcnt=1452, pcnt=1452; acc=39.486%/45.867% (test: 42%)
-        if 'F2_all_0':
+        if not 'F2_all_0':
             ''' RY - [pairwise(F2) - RY], param zero init '''
             vqc = self.var_circuit
             nq = self.num_qubits
