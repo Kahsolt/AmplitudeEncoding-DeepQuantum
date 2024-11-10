@@ -350,6 +350,53 @@ def encode_single_data(data, debug:bool=False):
                 vqc.add(g)
         return vqc
 
+    # std flatten:
+    # [n_rep=1] fid=0.962, gcnt=156, timecost=2224s; n_iter=500, n_worker=16
+    def vqc_F2_all_init_0(nq:int=12, n_rep:int=1):
+        ''' RY - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)    # init all
+        for i in range(nq):
+            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+            g.init_para([0.0])
+            vqc.add(g)
+        for _ in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                for j in range(i+1, nq):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+        for i in range(nq):
+            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+            g.init_para([0.0])
+            vqc.add(g)
+        return vqc
+
+    # std flatten:
+    # [n_rep=1] fid=0.966, gcnt=155, timecost=2219s; n_iter=500, n_worker=16
+    def vqc_F2_all_lazy_init_0(nq:int=12, n_rep:int=1):
+        ''' RY_pairwise(F2) - RY, param zero init '''
+        assert n_rep == 1
+        vqc = dq.QubitCircuit(nqubit=nq)
+        for i in range(nq-1):   # qubit order
+            g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+            g.init_para([2.4619188346815495 if i == 0 else 0.0])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+            vqc.add(g)
+            for j in range(i+1, nq):
+                g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
+                g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
+        for i in range(nq):
+            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+            g.init_para([0.0])
+            vqc.add(g)
+        return vqc
+
     n_iter = 500
     encoding_circuit = vqc_F2_all_wise_init_0(12, 1)
     gate_count = count_gates(encoding_circuit)
