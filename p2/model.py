@@ -380,8 +380,6 @@ class QuantumNeuralNetwork(nn.Module):
 
         # [std_flatten]
         # n_layer=10, gcnt=1452, pcnt=1452; best overfit acc=34.0%
-        # [qam_flatten(?)]
-        # n_layer=10, gcnt=1452, pcnt=1452; acc=39.486%/45.867% (test: 42%)
         if 'F2_all_0':
             ''' RY - [pairwise(F2) - RY], param zero init '''
             nq = self.num_qubits

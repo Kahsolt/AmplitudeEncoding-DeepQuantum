@@ -60,106 +60,7 @@ def get_acc(y_pred, y_true):
     return accuracy.item()
 
 
-def add_suffix(x:ndarray, suffix:str) -> ndarray:
-  x = deepcopy(x)
-  W, H = x.shape
-  for i in range(W):
-    for j in range(H):
-      x[i, j] = x[i, j] + suffix
-  return x
-
-def get_qam_array(n:int) -> ndarray:
-  if n == 2:
-    ''' 大端序读取顺序：
-      10 ← 00
-         ↘
-      11 ← 01
-    '''
-    return np.asarray([
-      ['10', '00'],
-      ['11', '01'],
-    ], dtype=object)
-  else:
-    x = get_qam_array(n - 2)
-    W, H = x.shape
-    x_ex = np.empty([2*W, 2*H], dtype=x.dtype)
-    x_ex[:W, :H] = add_suffix(x[:, ::-1],    '10')
-    x_ex[:W, H:] = add_suffix(x,             '00')
-    x_ex[W:, :H] = add_suffix(x[::-1, ::-1], '11')
-    x_ex[W:, H:] = add_suffix(x[::-1, :],    '01')
-    return x_ex
-
-bits_to_coord_cache = None
-bits_to_coord_flip_cache = None
-def qam_index_generator(nbps:int, flip:bool=False) -> Generator[Tuple[int, int], int, None]:
-  global bits_to_coord_cache, bits_to_coord_flip_cache
-  if bits_to_coord_cache is None:
-    def bstr_as_le_int(s:str) -> int:
-      return int(s, base=2)
-    def bstr_as_be_int(s:str) -> int:
-      return int(s[::-1], base=2)
-
-    array = get_qam_array(nbps)
-    H, W = array.shape
-    le_bstr_to_loc = []
-    be_bstr_to_loc = []
-    for x in range(H):
-      for y in range(W):
-        bstr = array[x, y]
-        le_bstr_to_loc.append((bstr_as_le_int(bstr), (x, y)))
-        be_bstr_to_loc.append((bstr_as_be_int(bstr), (x, y)))
-    le_bstr_to_loc.sort()
-    be_bstr_to_loc.sort()
-    bits_to_coord_cache      = [xy for _, xy in be_bstr_to_loc]   # deepquantum is big endian
-    bits_to_coord_flip_cache = [xy for _, xy in le_bstr_to_loc]   # if we flip it, then it's little endian
-
-  for xy in (bits_to_coord_flip_cache if flip else bits_to_coord_cache):
-    yield xy
-
-def qam_reshape_norm_padding(x:Tensor, nbps:int=12, hwc_order:bool=False) -> Tensor:
-  has_batch = True
-  if x.dim() == 3:
-    x = x.unsqueeze(0)
-    has_batch = False
-  assert len(x.shape) == 4        # [B, C, H, W]
-  ''' NOTE: must arrange in PLANNAR fmt instead of PACKED!
-  三通道RGB拼贴为单通道大图，布局为：(原点在左下角，图在第一象限)
-    | R | O |  =>  ['10','00']
-    | B | G |  <=  ['11','01']
-  以满足后缀索引 (大端序)：
-    |...00> - 全0
-    |...10> - R
-    |...01> - G
-    |...11> - B
-  '''
-  null_channel = torch.zeros_like(x[:, 0, ...])   # [B, H=32, W=32]
-  ch_order = 'RGB0'           # 通道序列化顺序
-  if ch_order == '0RGB':      # 开头补0
-    x_ex = torch.cat([        # [B, H_ex=64, W_ex=64]
-      torch.cat([x[:, 0, ...], null_channel], dim=-1),
-      torch.cat([x[:, 2, ...], x[:, 1, ...]], dim=-1),
-    ], dim=1)
-  elif ch_order == 'RGB0':    # 末尾补0 (better!)
-    x_ex = torch.cat([
-      torch.cat([x[:, 1, ...], x[:, 0, ...]], dim=-1),
-      torch.cat([null_channel, x[:, 2, ...]], dim=-1),
-    ], dim=1)
-  assert len(x_ex.shape) == 3     # [B, H_ex, W_ex]
-  pixels = []
-  for i, j in qam_index_generator(nbps, flip=hwc_order):
-    pixels.append(x_ex[:, i, j])
-  x = torch.stack(pixels, -1)     # [B, H_ex*W_ex]
-  x = F.normalize(x, p=2, dim=-1)
-  #x = F.pad(x, (0, 2**nbps - x.size(-1)), mode='constant', value=0.0)
-  if not has_batch:
-    x = x.squeeze(0)
-  return x.to(torch.complex64)  # [B, D=256]
-
-def reshape_norm_padding(x:Tensor, use_hijack:bool=False) -> Tensor:
-    # NOTE: 因为test脚本不能修改，所以需要在云评测时直接替换具体实现
-    if use_hijack:
-        return qam_reshape_norm_padding(x)
-
+def reshape_norm_padding(x:Tensor) -> Tensor:
     # x: CIFAR10 image with shape (3, 32, 32) or (batch_size, 3, 32, 32)
     if x.dim() == 3:
         assert x.shape == (3, 32, 32), f"Expected input shape (3, 32, 32), got {x.shape}"
@@ -192,6 +93,29 @@ cifar10_transforms = T.Compose([
     # This is 5-class stats on trainset
     #T.Normalize((0.4903, 0.4873, 0.4642), (0.2519, 0.2498, 0.2657)),
 ])
+
+def get_mean_std():
+    trainset = CIFAR10Dataset(train=True, transform=T.ToTensor())
+    testset = CIFAR10Dataset(train=False, transform=T.ToTensor())
+
+    # len(trainset): 25000
+    # len(testset): 500
+    print('len(trainset):', len(trainset))
+    print('len(testset):', len(testset))
+
+    traindata = torch.stack([e for e, _ in trainset.sub_dataset], axis=0)
+    testdata  = torch.stack([e for e, _ in testset.sub_dataset],  axis=0)
+
+    # NOTE: train 和 test 统计量只有千分位的差异，约 1/255 即一个像素值单位
+    # 但和总体均值偏差 4.5(mean) 个和 1.6(std) 个像素值单位
+    # traindata.mean: tensor([0.4903, 0.4873, 0.4642])
+    # traindata.std:  tensor([0.2519, 0.2498, 0.2657])
+    # testdata.mean:  tensor([0.4928, 0.4919, 0.4674])
+    # testdata.std:   tensor([0.2515, 0.2528, 0.2695])
+    print('traindata.mean:', traindata.mean(axis=(0,2,3)))
+    print('traindata.std:',  traindata.std (axis=(0,2,3)))
+    print('testdata.mean:',  testdata.mean (axis=(0,2,3)))
+    print('testdata.std:',   testdata.std  (axis=(0,2,3)))
 
 
 class CIFAR10Dataset(Dataset):
