@@ -86,3 +86,9 @@ wget -nc https://arxiv.org/pdf/1907.06840.pdf
 REM Representation of binary classification trees with binary features by quantum circuits
 REM https://quantum-journal.org/papers/q-2022-03-30-676/
 REM https://github.com/RaoulHeese/qtree
+
+
+:QSynth
+
+REM Synthesis of Quantum Logic Circuit
+wget -nc https://arxiv.org/pdf/quant-ph/0406176.pdf

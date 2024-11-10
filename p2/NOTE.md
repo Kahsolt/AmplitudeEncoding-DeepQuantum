@@ -226,3 +226,7 @@ $$
 
 - (Quanvolution) https://github.com/anthonysmaldone/qcnn-multi-channel-supervised-learning
 - (Hybrid) https://github.com/DRA-chaos/Quantum-Classical-Hyrid-Neural-Network-for-binary-image-classification-using-PyTorch-Qiskit-pipeline
+- Qiskit
+  - qiskit-machine-learning: https://github.com/qiskit-community/qiskit-machine-learning
+    - doc: https://qiskit-community.github.io/qiskit-machine-learning/index.html
+  - circuit synthesis: https://quantumcomputing.stackexchange.com/questions/13821/generate-a-3-qubit-swap-unitary-in-terms-of-elementary-gates/13826#13826
