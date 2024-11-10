@@ -13,6 +13,7 @@ from torch import Tensor
 import torch.nn as nn
 from torch.utils.data import Dataset
 import torch.nn.functional as F
+from torch.optim import Adam
 from torchvision.datasets import CIFAR10
 import torchvision.transforms as T
 import deepquantum as dq
@@ -37,6 +38,7 @@ if os.getenv('MY_LABORATORY') or sys.platform == 'win32':
 else:
     DATA_PATH = '/data'
 
+get_score = lambda fid, gcnt: 2 * fid - gcnt / 2000
 
 def count_gates(cir:dq.QubitCircuit):
     count = 0
@@ -246,6 +248,7 @@ def encode_single_data(data, debug:bool=False):
     # [n_rep=2] fid=0.919, gcnt=289, timecost=1699s; n_iter=200, n_worker=16
     # std flatten:
     # [n_rep=1] fid=0.966, gcnt=145, timecost=2131s; n_iter=500, n_worker=16
+    # [n_rep=1] fid=0.961, gcnt=101.446, timecost=1589s; n_iter=400(use_finetune=3:1), n_worker=16
     # qam flatten:
     # [n_rep=1] fid=0.956, gcnt=145, timecost=795s; n_iter=200, n_worker=16
     # [n_rep=1] fid=0.959, gcnt=145, timecost=1947s; n_iter=500, n_worker=16
@@ -321,29 +324,31 @@ def encode_single_data(data, debug:bool=False):
             vqc.add(g)
         return vqc
 
-    n_iter = 500
+    n_iter = 400
+    use_finetune = True
     encoding_circuit = vqc_F2_all_wise_init_0(12, 1)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
         is_show_gate_count = False
         print('gate_count:', gate_count)
 
+    if use_finetune:
+        train_iter    = n_iter // 4 * 3
+        finetune_iter = n_iter // 4
+    else:
+        train_iter    = n_iter
     # 优化参数，使得线路能够制备出|x>
     target = reshape_norm_padding(image)
-    optimizer = torch.optim.Adam(encoding_circuit.parameters(), lr=0.1)
+    optimizer = Adam(encoding_circuit.parameters(), lr=0.1)
     loss_list = []
-    for _ in range(n_iter):
+    for _ in range(train_iter):
         state = encoding_circuit().unsqueeze(0)
         loss = -get_fidelity(state, target)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         if debug: loss_list.append(loss.item())
-    if debug:
-        tht0 = encoding_circuit.operators[0].theta
-        print('tht0:', tht0.item())
-        print('fid:', -loss.item())
-        import matplotlib.pyplot as plt
+    if debug and not use_finetune:
         plt.subplot(211) ; plt.plot(loss_list) ; plt.title('loss')
         plt.subplot(212)
         plt.plot(target        .real.flatten(), 'b', label='target')
@@ -351,11 +356,73 @@ def encode_single_data(data, debug:bool=False):
         plt.legend()
         plt.tight_layout()
         plt.show()
-        breakpoint()
-    print('fid:', -loss.item())
+        #breakpoint()
 
+    if use_finetune:
+        encoding_circuit = prune_circuit(encoding_circuit, target, optimizer)
+
+        for _ in range(finetune_iter):
+            state = encoding_circuit().unsqueeze(0)
+            loss = -get_fidelity(state, target)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            if debug: loss_list.append(loss.item())
+        if debug:
+            plt.subplot(211) ; plt.plot(loss_list) ; plt.title('loss')
+            plt.subplot(212)
+            plt.plot(target        .real.flatten(), 'b', label='target')
+            plt.plot(state.detach().real.flatten(), 'r', label='state')
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            #breakpoint()
+
+        gate_count_prune = count_gates(encoding_circuit)
+        if gate_count != gate_count_prune:
+            #print('gate_count_prune:', gate_count_prune)
+            gate_count = gate_count_prune
+
+    print('score:', get_score(-loss.item(), gate_count))
     # Detach the state tensor before returning
     return (image, label, encoding_circuit().detach(), gate_count)
+
+@torch.inference_mode
+def prune_circuit(qc:dq.QubitCircuit, tgt:Tensor, opt:Adam) -> dq.QubitCircuit:
+    PI = np.pi
+    PI2 = np.pi * 2
+    def phi_norm(agl:float) -> float:
+        agl %= PI2
+        if agl > +PI: agl -= PI2
+        if agl < -PI: agl += PI2
+        return agl
+
+    params = opt.param_groups[0]['params']
+    ops: nn.Sequential = qc.operators
+    fid = get_fidelity(qc().unsqueeze(0), tgt).item()
+    gcnt = count_gates(qc)
+    sc = get_score(fid, gcnt)
+    sc_new = sc
+    while sc_new >= sc:
+        idx_sel = -1
+        min_agl = 3.14
+        for idx, op in enumerate(ops):
+            agl = abs(phi_norm(op.theta.item()))
+            if agl < min_agl:
+                min_agl = agl
+                idx_sel = idx
+        # remove from circuit
+        del ops[idx_sel]
+        # remove from optimizer
+        tensor = params[idx_sel]
+        del params[idx_sel]
+        del opt.state[tensor]
+        # new score
+        fid = get_fidelity(qc().unsqueeze(0), tgt).item()
+        gcnt -= 1
+        sc_new = get_score(fid, gcnt)
+
+    return qc
 
 
 class QCIFAR10Dataset(Dataset):

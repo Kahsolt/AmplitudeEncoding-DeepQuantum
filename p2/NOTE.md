@@ -135,8 +135,9 @@ runtime:    15.163 /  15.341  /  15.272
 [Trail 5] no_data_norm + std_flatten (overfit!)
 enc:
   | encoder | n_layer | gate count | fidelity | score | comment |
-  | vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm, std_flatten, n_iter=500 |
-  | vqc_F2_all_wise_init_0 | 1 | 145 | 0.966 | 2.8595 | no_data_norm, std_flatten, n_iter=500 |
+  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.959 | 2.8455   | no_data_norm, std_flatten, n_iter=500 |
+  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.966 | 2.8595   | no_data_norm, std_flatten, n_iter=500 |
+  | vqc_F2_all_wise_init_0 | 1 | 101.446 | 0.961 | 2.871277 | no_data_norm, std_flatten, n_iter=400(use_finetune=3:1) |
 clf:
   | vqc | acc |
   | qcnn     (nlayer=8)  | 42.8% |
@@ -148,6 +149,20 @@ clf:
   test gates: 145.000
   runtime: 3.512
   客观得分: 338.730
+-----------------------
+  classifier gate count: 1772
+  test fid: 0.961
+  test acc: 0.428
+  test gates: 101.446
+  runtime: 3.433
+  客观得分: 339.793
+[Submit]
+  classifier gate count: 1772
+  Fidelity: 0.961
+  Accuracy: 0.428
+  振幅编码线路门的个数: 101.446
+  运行时间: 1.1226468086242676
+  客观得分: 339.8572680920283
 ```
 
 

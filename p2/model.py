@@ -102,10 +102,9 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(wires=3, basis='z')
             vqc.observable(wires=4, basis='z')
 
-        # n_layer=8,  gcnt=1772, pcnt=2412; acc=43%
-        # n_layer=10, gcnt=2230, pcnt=3030; acc=43%
-        # n_layer=30, gcnt=6612, pcnt=9012; acc=43% (wtf?)
-        if not 'qcnn':
+        # [std_flatten]
+        # n_layer=8,  gcnt=1772, pcnt=2412; best overfit acc=42.8%
+        if 'qcnn':
             def add_U(i:int, j:int):  # conv
                 vqc.u3(i) ; vqc.u3(j)
                 vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
@@ -380,7 +379,7 @@ class QuantumNeuralNetwork(nn.Module):
 
         # [std_flatten]
         # n_layer=10, gcnt=1452, pcnt=1452; best overfit acc=34.0%
-        if 'F2_all_0':
+        if not 'F2_all_0':
             ''' RY - [pairwise(F2) - RY], param zero init '''
             nq = self.num_qubits
             for i in range(nq):

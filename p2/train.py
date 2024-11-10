@@ -140,13 +140,13 @@ if __name__ == '__main__':
     NUM_EPOCHS = 30 
     OUTPUT_DIR  = 'output'
 
-    if not 'test overfit':      # 实验性地过拟合测试集，使用编码数据
+    if 'test overfit':      # 实验性地过拟合测试集，使用编码数据
         with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as fh:
             dataset = pickle.load(fh)
         train_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True,  drop_last=True)
         valid_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, drop_last=False)
     else:
-        dataset = PerfectAmplitudeEncodingDataset(train=True, size=2500) # todo: 修改为合适的配置
+        dataset = PerfectAmplitudeEncodingDataset(train=True)   # 用全部数据训练，防止过拟合
         print('dataset labels:', Counter(sample[1].item() for sample in dataset))
         train_size = int(0.7 * len(dataset))
         valid_size = len(dataset) - train_size
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     Epoch 17/30 - Train loss: 1.4880423, Train acc: 44.629%, Valid loss: 1.4902040, Valid acc: 42.400%
     '''
     # 创建一个量子神经网络模型
-    model_config = {'num_qubits': 12, 'num_layers': 10} # todo: 修改为合适的配置
+    model_config = {'num_qubits': 12, 'num_layers': 8} # todo: 修改为合适的配置
     model = QuantumNeuralNetwork(**model_config)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
