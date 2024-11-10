@@ -29,6 +29,7 @@ Gate = dq.operation.Operation
 # 注意: 选手的模型名字必须固定为 QuantumNeuralNetwork
 # todo: 构建表达能力更强的变分量子线路以提高分类准确率
 class QuantumNeuralNetwork(nn.Module):
+
     def __init__(self, num_qubits, num_layers):
         super().__init__()
         self.num_qubits = num_qubits
@@ -104,7 +105,7 @@ class QuantumNeuralNetwork(nn.Module):
 
         # [std_flatten]
         # n_layer=8,  gcnt=1772, pcnt=2412; best overfit acc=42.8%
-        if 'qcnn':
+        if not 'qcnn':
             def add_U(i:int, j:int):  # conv
                 vqc.u3(i) ; vqc.u3(j)
                 vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
@@ -405,6 +406,130 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(2, basis='z')
             vqc.observable(3, basis='z')
             vqc.observable(4, basis='z')
+
+        # [std_flatten]
+        # n_layer=6,  gcnt=936,  pcnt=1260; best overfit acc=39.8%
+        # n_layer=8,  gcnt=1224, pcnt=1656; best overfit acc=43.4% (meas xyz-01)
+        #                                   best overfit acc=41.0% (meas xyz-67)
+        #                                   best overfit acc=41.8% (meas z-all)
+        # n_layer=12, gcnt=1800, pcnt=2448; best overfit acc=41.6%
+        if 'U-V brick':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                wire_p3 = wires[3:] + wires[:3]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=3
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p3):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10) ; add_U(11, 0)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9)  ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9)  ; add_V(10, 11)
+            # fc
+            add_F(list(range(12)))  # 后面不接 u3 更好
+            # meas
+            sel = 'xyz-01'
+            if sel == 'xyz-01':
+                vqc.observable(0, basis='z')
+                vqc.observable(0, basis='x')
+                vqc.observable(0, basis='y')
+                vqc.observable(1, basis='z')
+                vqc.observable(1, basis='x')
+            elif sel == 'xyz-67':
+                vqc.observable(6, basis='z')
+                vqc.observable(6, basis='x')
+                vqc.observable(6, basis='y')
+                vqc.observable(7, basis='z')
+                vqc.observable(7, basis='x')
+            elif sel == 'z-all':
+                vqc.observable(0, basis='z')
+                vqc.observable(1, basis='z')
+                vqc.observable(2, basis='z')
+                vqc.observable(3, basis='z')
+                vqc.observable(4, basis='z')
+
+        # [std_flatten]
+        # n_layer=8,  gcnt=1034, pcnt=1518; best overfit acc=35.8%
+        if not 'U cyclic':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                wire_p3 = wires[3:] + wires[:3]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=3
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p3):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                for i in range(self.num_qubits):
+                    add_U(i, (i + 1) % self.num_qubits)
+            # fc
+            add_F(list(range(12)))
+            vqc.u3(wires=0)
+            vqc.u3(wires=1)
+            # meas
+            vqc.observable(0, basis='z')
+            vqc.observable(0, basis='x')
+            vqc.observable(0, basis='y')
+            vqc.observable(1, basis='z')
+            vqc.observable(1, basis='x')
+
+        # [std_flatten]
+        # n_layer=8,  gcnt=5282, pcnt=7926; best overfit acc=35.8%
+        if not 'U all':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            for _ in range(self.num_layers):
+                for i in range(self.num_qubits-1):
+                    for j in range(i + 1, self.num_qubits):
+                        add_U(i, j)
+            # fc
+            vqc.u3(wires=0)
+            vqc.u3(wires=1)
+            # meas
+            vqc.observable(0, basis='z')
+            vqc.observable(0, basis='x')
+            vqc.observable(0, basis='y')
+            vqc.observable(1, basis='z')
+            vqc.observable(1, basis='x')
 
         print('classifier gate count:', count_gates(vqc))
 

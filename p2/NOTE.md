@@ -142,6 +142,7 @@ clf:
   | vqc | acc |
   | qcnn     (nlayer=8)  | 42.8% |
   | F2_all_0 (nlayer=10) | 34.0% |
+  | U-V brick (nlayer=8) | 43.4% |
 [Local]
   classifier gate count: 1772
   test fid: 0.966
@@ -156,13 +157,29 @@ clf:
   test gates: 101.446
   runtime: 3.433
   客观得分: 339.793
+-----------------------
+  classifier gate count: 1224
+  test fid: 0.961
+  test acc: 0.434
+  test gates: 101.446
+  runtime: 2.380
+  客观得分: 340.422
 [Submit]
+  xxx
+-----------------------
   classifier gate count: 1772
   Fidelity: 0.961
   Accuracy: 0.428
   振幅编码线路门的个数: 101.446
   运行时间: 1.1226468086242676
   客观得分: 339.8572680920283
+-----------------------
+  classifier gate count: 1224
+  Fidelity: 0.961
+  Accuracy: 0.434
+  振幅编码线路门的个数: 101.446
+  运行时间: 0.7958643436431885
+  客观得分: 340.46634361842473
 ```
 
 
