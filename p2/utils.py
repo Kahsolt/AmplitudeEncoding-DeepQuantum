@@ -89,7 +89,7 @@ def reshape_norm_padding(x:Tensor) -> Tensor:
 cifar10_transforms = T.Compose([
     T.ToTensor(),
     # this is wrong!
-    #T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     # use this instead :)
     #T.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     # This is 5-class stats on trainset
@@ -221,6 +221,8 @@ def encode_single_data(data, debug:bool=False):
     global is_show_gate_count
     image, label = data     # [3, 32, 32], []
 
+    # std flatten (+data_norm):
+    # [n_rep=3] fid=0.885, gcnt=173.938, timecost=2645; n_iter=400(use_finetune=3:1), n_worker=16
     # qam flatten:
     # [n_rep=1] fid=0.910, gcnt=79,  timecost=447s; n_iter=200, n_worker=16
     # [n_rep=2] fid=0.949, gcnt=157, timecost=853s; n_iter=200, n_worker=16
@@ -246,6 +248,9 @@ def encode_single_data(data, debug:bool=False):
     # std flatten (+data_norm):
     # [n_rep=1] fid=0.846, gcnt=145, timecost=869s; n_iter=200, n_worker=16
     # [n_rep=2] fid=0.919, gcnt=289, timecost=1699s; n_iter=200, n_worker=16
+    # [n_rep=1] fid=0.849, gcnt=116.982, score=2.639509, timecost=1640s; n_iter=400(use_finetune=3:1), n_worker=16
+    # [n_rep=2] fid=0.921, gcnt=200.908, score=2.741546, timecost=3373s; n_iter=400(use_finetune=3:1), n_worker=16
+    # [n_rep=3] fid=0.947, gcnt=286.830, score=2.750585, timecost=5049s; n_iter=400(use_finetune=3:1), n_worker=16
     # std flatten:
     # [n_rep=1] fid=0.966, gcnt=145, timecost=2131s; n_iter=500, n_worker=16
     # [n_rep=1] fid=0.961, gcnt=101.446, timecost=1589s; n_iter=400(use_finetune=3:1), n_worker=16
@@ -326,7 +331,7 @@ def encode_single_data(data, debug:bool=False):
 
     n_iter = 400
     use_finetune = True
-    encoding_circuit = vqc_F2_all_wise_init_0(12, 1)
+    encoding_circuit = vqc_F2_all_wise_init_0(12, 3)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
         is_show_gate_count = False

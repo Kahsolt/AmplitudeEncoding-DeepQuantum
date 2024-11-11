@@ -54,14 +54,14 @@ runtime:    15.163 /  15.341  /  15.272
   运行时间: 5.347104549407959
   客观得分: 335.0461788574855
 
-[Trail 2] qam_flatten (optimize & bugfix)
+[Trail 2] qam_flatten + no_data_norm (optimize & bugfix)
 | encoder | n_layer | gate count | fidelity | score | comment |
-| vqc_F1_all_wise_init_0 | 1 |  79 | 0.910 | 2.7805 | no_data_norm |
-| vqc_F1_all_wise_init_0 | 2 | 157 | 0.949 | 2.8195 | no_data_norm |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.956 | 2.8385 | no_data_norm |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm, n_iter=500 (⭐) |
-| vqc_F2_all_wise_init_0 | 2 | 289 | 0.973 | 2.8015 | no_data_norm |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.951 | 2.8295 | no_data_norm, hwc order |
+| vqc_F1_all_wise_init_0 | 1 |  79 | 0.910 | 2.7805 | no_data_norm + qam_flatten, n_iter=200 |
+| vqc_F1_all_wise_init_0 | 2 | 157 | 0.949 | 2.8195 | no_data_norm + qam_flatten, n_iter=200 |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.956 | 2.8385 | no_data_norm + qam_flatten, n_iter=200 |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm + qam_flatten, n_iter=500 (⭐) |
+| vqc_F2_all_wise_init_0 | 2 | 289 | 0.973 | 2.8015 | no_data_norm + qam_flatten, n_iter=200 |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.951 | 2.8295 | no_data_norm + qam_flatten, n_iter=200, hwc order |
 [Local] (暂用基线clf，qcnn过拟合了更烂)
   classifier gate count: 14400
   test fid: 0.959
@@ -72,8 +72,8 @@ runtime:    15.163 /  15.341  /  15.272
 
 [Trail 3] std_flatten + data_norm (we'are fucking back!)
 | encoder | n_layer | gate count | fidelity | score | comment |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.846 | 2.6195 | data_norm |
-| vqc_F2_all_wise_init_0 | 2 | 289 | 0.919 | 2.6935 | data_norm |
+| vqc_F2_all_wise_init_0 | 1 | 145 | 0.846 | 2.6195 | data_norm + std_flatten |
+| vqc_F2_all_wise_init_0 | 2 | 289 | 0.919 | 2.6935 | data_norm + std_flatten |
 😈 分类模型使用 qcnn，离奇的是训练时验证集精度仍然在 42% 左右，测试精度 39.4%
 难道任何 ansatz 结构无论在 std 还是 qam 展开方式下，最高精度都突破不了这个神秘数字 42%??
 
@@ -135,9 +135,9 @@ runtime:    15.163 /  15.341  /  15.272
 [Trail 5] no_data_norm + std_flatten (overfit!)
 enc:
   | encoder | n_layer | gate count | fidelity | score | comment |
-  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.959 | 2.8455   | no_data_norm, std_flatten, n_iter=500 |
-  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.966 | 2.8595   | no_data_norm, std_flatten, n_iter=500 |
-  | vqc_F2_all_wise_init_0 | 1 | 101.446 | 0.961 | 2.871277 | no_data_norm, std_flatten, n_iter=400(use_finetune=3:1) |
+  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.959 | 2.8455   | no_data_norm + std_flatten, n_iter=500 |
+  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.966 | 2.8595   | no_data_norm + std_flatten, n_iter=500 |
+  | vqc_F2_all_wise_init_0 | 1 | 101.446 | 0.961 | 2.871277 | no_data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
 clf:
   | vqc | acc |
   | qcnn     (nlayer=8)  | 42.8% |
@@ -180,6 +180,13 @@ clf:
   振幅编码线路门的个数: 101.446
   运行时间: 0.7958643436431885
   客观得分: 340.46634361842473
+
+[Trail 6] data_norm + std_flatten (遵守游戏规则！😈)
+enc:
+  | encoder | n_layer | gate count | fidelity | score | comment |
+  | vqc_F2_all_wise_init_0 | 1 | 116.982 | 0.849 | 2.639509 | data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
+  | vqc_F2_all_wise_init_0 | 2 | 200.908 | 0.921 | 2.741546 | data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
+  | vqc_F2_all_wise_init_0 | 3 | 286.830 | 0.947 | 2.750585 | data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
 ```
 
 
