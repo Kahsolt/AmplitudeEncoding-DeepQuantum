@@ -51,10 +51,10 @@ TODO: enc 和 clf 部分都还可以加大优化步数
 
 | enc ckpt | clf(n_layer) | gcnt/pcnt | acc | ~total_score | comment |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| F2(1) [score:2.871277] | U-V brick(8)  | 1224/1656 | 43.4% | 340.5277 | overfit, no_norm |
-| F2(1) [score:2.871277] | U-V brick(10) | 1512/2052 | 54.6% | 351.7277 | overfit, no_norm, contrastive-learning |
-| F2(3) [score:2.750585] | U-V brick(8)  | 1224/1656 |       |          | overfit,    norm |
-| F2(3) [score:2.750585] | U-V brick(10) | 1512/2052 | 59.6% | 344.6585 | overfit,    norm, contrastive-learning |
+| F2(1) [score:2.871277] | U-V brick(8)  [Ansatz] | 1224/1656 | 44.4% | 341.5277 | overfit test, no_norm |
+| F2(1) [score:2.871277] | U-V brick(10) [CL]     | 1512/2232 | 56.2% | 353.2100 | overfit test, no_norm (most cheaty! 😈) |
+| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 59.6% | 344.6585 | overfit test,    norm |
+| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 46.4% | 331.4585 | train-test,      norm (most honesty! 👼) |
 
 
 ### 关于数据规范化の分析

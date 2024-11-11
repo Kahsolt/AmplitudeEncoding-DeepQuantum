@@ -54,6 +54,13 @@ def get_fidelity(state_pred, state_true):
     fidelity = (state_pred * state_true).sum(-1)**2
     return fidelity.mean()
 
+def get_fidelity_NtoN(state_pred:Tensor, state_true:Tensor) -> Tensor:
+    # state_pred, state_true: (batch_size, 4096, 1)
+    state_pred = state_pred.flatten(1).real
+    state_true = state_true.flatten(1).real
+    fid_mat = torch.abs(torch.matmul(state_true, state_pred.T)) ** 2
+    return fid_mat
+
 @torch.inference_mode
 def get_acc(y_pred, y_true):
     # 计算准确率
@@ -89,7 +96,7 @@ def reshape_norm_padding(x:Tensor) -> Tensor:
 cifar10_transforms = T.Compose([
     T.ToTensor(),
     # this is wrong!
-    T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    #T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     # use this instead :)
     #T.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     # This is 5-class stats on trainset

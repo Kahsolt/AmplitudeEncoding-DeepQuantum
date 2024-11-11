@@ -6,11 +6,12 @@ from typing import List
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
+from torch import Tensor
 import numpy as np
 import deepquantum as dq
 
-from utils import QCIFAR10Dataset, PerfectAmplitudeEncodingDataset, reshape_norm_padding, get_fidelity, count_gates
+from utils import QCIFAR10Dataset, PerfectAmplitudeEncodingDataset, reshape_norm_padding, get_fidelity, get_fidelity_NtoN, count_gates
 
 # 设置随机种子
 SEED = 42
@@ -28,7 +29,7 @@ Gate = dq.operation.Operation
 
 # 注意: 选手的模型名字必须固定为 QuantumNeuralNetwork
 # todo: 构建表达能力更强的变分量子线路以提高分类准确率
-class QuantumNeuralNetwork(nn.Module):
+class QuantumNeuralNetworkAnsatz(nn.Module):
 
     def __init__(self, num_qubits, num_layers):
         super().__init__()
@@ -401,7 +402,7 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(4, basis='z')
 
         # n_layer=6,  gcnt=936,  pcnt=1260; best overfit acc=39.8%
-        # n_layer=8,  gcnt=1224, pcnt=1656; best overfit acc=43.4% (meas xyz-01)
+        # n_layer=8,  gcnt=1224, pcnt=1656; best overfit acc=44.4% (meas xyz-01)
         #                                   best overfit acc=41.0% (meas xyz-67)
         #                                   best overfit acc=41.8% (meas z-all)
         # n_layer=12, gcnt=1800, pcnt=2448; best overfit acc=41.6%
@@ -540,6 +541,185 @@ class QuantumNeuralNetwork(nn.Module):
         self.var_circuit(state=z)
         output = self.var_circuit.expectation()     
         return output
+
+
+# 对比学习!!
+class QuantumNeuralNetworkCL(nn.Module):
+
+    def __init__(self, num_qubits, num_layers):
+        super().__init__()
+        self.num_qubits = num_qubits
+        self.num_layers = num_layers
+        self.var_circuit = dq.QubitCircuit(num_qubits)
+        self.create_var_circuit()
+
+        # [NC=5, M=36], remember to backfill refdata after training finished
+        self.ref_qstate: nn.Parameter = nn.Parameter(torch.zeros([5, 36], requires_grad=False))
+        self.is_training = False    # when True, do not use `self.ref_qstate`
+
+    def create_var_circuit(self):
+        vqc = self.var_circuit
+
+        # n_layer=8,  gcnt=1772, pcnt=2412
+        if not 'qcnn':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=2
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wire_p1, wires):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                # layer1
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9) ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9) ; add_V(10, 11)
+                # layer2
+                add_U(1, 3) ; add_U(5, 7) ; add_U(9, 11)
+                add_U(3, 5) ; add_U(7, 9)
+                add_V(3, 5) ; add_V(7, 9)
+                # layer3
+                add_U(3, 7) ; add_V(3, 7)
+                add_U(7, 11) ; add_V(7, 11)
+            # fc
+            add_F([7, 11])
+
+        # n_layer=8,  gcnt=1164, pcnt=1164
+        if not 'F2_all_0':
+            ''' RY - [pairwise(F2) - RY], param zero init '''
+            nq = self.num_qubits
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
+            for _ in range(self.num_layers):
+                for i in range(nq-1):   # qubit order
+                    for j in range(i+1, nq):
+                        g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                        g.init_para([0.0])
+                        vqc.add(g)
+                        g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                        g.init_para([0.0])
+                        vqc.add(g)
+                for i in range(nq):
+                    g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+
+        # n_layer=8,  gcnt=1224, pcnt=1656
+        # n_layer=10, gcnt=1512, pcnt=2052
+        if 'U-V brick':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                wire_p3 = wires[3:] + wires[:3]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=3
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p3):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10) ; add_U(11, 0)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9)  ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9)  ; add_V(10, 11)
+            # fc
+            add_F(list(range(12)))  # 后面不接 u3 更好
+
+        for i in range(self.num_qubits):
+            vqc.observable(i, 'x')
+            vqc.observable(i, 'y')
+            vqc.observable(i, 'z')
+
+        print('classifier gate count:', count_gates(vqc))
+
+    @torch.no_grad
+    def mk_ref_qstate(self, ref_data:Dataset, device:str):
+        # 类中心的测量结果视作参考
+        y_x = {}
+        for _, y, x in ref_data:
+            x = x.real.flatten()
+            y = y.item()
+            if y not in y_x: y_x[y] = []
+            y_x[y].append(x)
+        y_x = sorted([(y, np.stack(xs, axis=-1).mean(axis=-1)) for y, xs in y_x.items()])
+        z = torch.from_numpy(np.stack([x for y, x in y_x], axis=0)).to(device=device, dtype=torch.complex64)
+        self.var_circuit(state=z)
+        outputs = self.var_circuit.expectation()
+        fake_qstate = F.normalize(outputs, dim=-1)
+        fake_qstate.requires_grad = False
+        self.ref_qstate = nn.Parameter(fake_qstate)
+
+    def postprocess(self, outputs:Tensor):
+        fake_qstate = F.normalize(outputs, dim=-1)
+        ref_states = fake_qstate if self.is_training else self.ref_qstate
+        fid_mat = get_fidelity_NtoN(ref_states, fake_qstate)    # [B, NC=5]
+        return fid_mat  
+
+    def forward(self, z:Tensor, y:Tensor):
+        '''
+          A bite of quantum contrastive learning
+          - 不能直接对态的保真度进行优化，因为酉变换保正交性 =_=||
+          - 那就把一组投影测量指当作某种概率分布来求余弦相似度吧
+        '''
+        self.var_circuit(state=z)
+        outputs = self.var_circuit.expectation()     # [B, M=36]
+        fid_mat = self.postprocess(outputs)
+        lbl_mat = y.unsqueeze(0) == y.unsqueeze(1)     # 同类 mask
+        sum_eq = lbl_mat.sum()              # 同类样本对数
+        sum_ne = lbl_mat.numel() - sum_eq   # 不同类样本对数
+        fid_eq = (fid_mat *  lbl_mat).sum() / sum_eq
+        fid_ne = (fid_mat * ~lbl_mat).sum() / sum_ne
+        loss = fid_ne - fid_eq
+        return loss, fid_eq, fid_ne
+
+    @torch.inference_mode()
+    def inference(self, z):
+        self.var_circuit(state=z)
+        outputs = self.var_circuit.expectation()    # [B, M=36]
+        fid_mat = self.postprocess(outputs)
+        return F.softmax(fid_mat, dim=-1)           # [B, NC=5]
+
+
+QuantumNeuralNetwork = QuantumNeuralNetworkCL
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 import os
-import time
-import pickle
 import random
+from time import time
+import pickle as pkl
 
 import torch
 from torch.utils.data import DataLoader
@@ -80,14 +80,14 @@ if __name__ == '__main__':
     OUTPUT_DIR = "output"
     BATCH_SIZE = 64    # todo: 修改为合适的配置
 
-    t0 = time.time()
+    t0 = time()
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:
-        test_dataset = pickle.load(file)
-    t1 = time.time()
+        test_dataset = pkl.load(file)
+    t1 = time()
     print(f'>> load pickle done ({t1 - t0:.3f}s)')      # 0.121s
-    t0 = time.time()
+    t0 = time()
     is_valid = validate_test_dataset(test_dataset)
-    t1 = time.time()
+    t1 = time()
     print(f'>> check dataset done ({t1 - t0:.3f}s)')    # 1.583s
     if not is_valid:
         raise RuntimeError('test_dataset is not valid')
@@ -97,17 +97,17 @@ if __name__ == '__main__':
     x, y, z = x.to(DEVICE), y.to(DEVICE), z.to(DEVICE)
 
     with open(f'{OUTPUT_DIR}/model_config.pkl', 'rb') as file:
-        model_config = pickle.load(file)
+        model_config = pkl.load(file)
     model = QuantumNeuralNetwork(**model_config).to(DEVICE)
     
     output = model.inference(z)
     model.load_state_dict(torch.load(f'{OUTPUT_DIR}/best_model.pt', map_location=torch.device('cpu')))
 
     # 测试模型
-    t0 = time.time()
+    t0 = time()
     acc, fid, gates = test_model(model, test_loader, DEVICE)
     torch.cuda.current_stream().synchronize()
-    t1 = time.time()
+    t1 = time()
     runtime = t1 - t0
 
     print(f'test fid: {fid:.3f}')
