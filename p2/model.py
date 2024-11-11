@@ -103,7 +103,6 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(wires=3, basis='z')
             vqc.observable(wires=4, basis='z')
 
-        # [std_flatten]
         # n_layer=8,  gcnt=1772, pcnt=2412; best overfit acc=42.8%
         if not 'qcnn':
             def add_U(i:int, j:int):  # conv
@@ -154,12 +153,7 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(11, basis='z')
             vqc.observable(11, basis='x')
 
-        # [std_flatten]
         # n_layer=24, gcnt=5292, pcnt=1524; best overfit acc=42.8%
-        # [qam_flatten]
-        # n_layer=8,  gcnt=1772, pcnt=516;  best overfit acc=38.6%
-        # n_layer=12, gcnt=2652, pcnt=768;  best overfit acc=41.0%
-        # n_layer=24, gcnt=5292, pcnt=1524; best overfit acc=44.4%
         if not 'real qcnn (3 blocks)':     # parameter shared!
             def mk_U_gates() -> List[Gate]:
                 return [
@@ -378,7 +372,6 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(9,  basis='z')
             vqc.observable(3,  basis='x')
 
-        # [std_flatten]
         # n_layer=10, gcnt=1452, pcnt=1452; best overfit acc=34.0%
         if not 'F2_all_0':
             ''' RY - [pairwise(F2) - RY], param zero init '''
@@ -407,7 +400,6 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(3, basis='z')
             vqc.observable(4, basis='z')
 
-        # [std_flatten]
         # n_layer=6,  gcnt=936,  pcnt=1260; best overfit acc=39.8%
         # n_layer=8,  gcnt=1224, pcnt=1656; best overfit acc=43.4% (meas xyz-01)
         #                                   best overfit acc=41.0% (meas xyz-67)
@@ -469,7 +461,6 @@ class QuantumNeuralNetwork(nn.Module):
                 vqc.observable(3, basis='z')
                 vqc.observable(4, basis='z')
 
-        # [std_flatten]
         # n_layer=8,  gcnt=1034, pcnt=1518; best overfit acc=35.8%
         if not 'U cyclic':
             def add_U(i:int, j:int):  # conv
@@ -507,7 +498,6 @@ class QuantumNeuralNetwork(nn.Module):
             vqc.observable(1, basis='z')
             vqc.observable(1, basis='x')
 
-        # [std_flatten]
         # n_layer=8,  gcnt=5282, pcnt=7926; best overfit acc=35.8%
         if not 'U all':
             def add_U(i:int, j:int):  # conv

@@ -21,185 +21,53 @@ test acc: 0.306
 test gates: 1212.000
 runtime: 111.535
 客观得分: 146.514
-
-[Trail 0]
-- enc: vqc_F1_all_wise_init_0 (d=1/2/3), no_data_norm
-- clf: baseline[RY-cyclic(CNOT)|z(0~4)]
-test fid:   0.930  /  0.954   /  0.965
-test acc:   0.360  /  0.352   /  0.360
-test gates:   79   /   157    /   235
-runtime:    15.163 /  15.341  /  15.272
-客观得分:   327.702 / 327.634  / 326.741
-ℹ 需达到 fid=0.95 左右，可视化为图像才看起来有人类可识别的同一性
-
-[Trail 1] qam_flatten
-| encoder | n_layer | gate count | fidelity | score | comment |
-| vqc_F1_all_wise_init   | 3 |  79 | 0.903 | 2.7665 | no_data_norm |
-| vqc_F1_all_wise_init_0 | 1 |  79 | 0.906 | 2.7725 | no_data_norm |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.946 | 2.8195 | no_data_norm |
-| vqc_F2_all_wise_init_0 | 2 | 289 | 0.961 | 2.7775 | no_data_norm |
-| vqc_F1_all_wise_init_0 | 1 |  79 | 0.935 | 2.8305 | no_data_norm, hwc order |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.952 | 2.8315 | no_data_norm, hwc order (⭐) |
-[Local]
-  classifier gate count: 14400
-  test fid: 0.952
-  test acc: 0.420
-  test gates: 145.000
-  runtime: 15.296
-  客观得分: 334.770
-[Submit]
-  Fidelity: 0.952
-  Accuracy: 0.420
-  振幅编码线路门的个数: 145.0
-  运行时间: 5.347104549407959
-  客观得分: 335.0461788574855
-
-[Trail 2] qam_flatten + no_data_norm (optimize & bugfix)
-| encoder | n_layer | gate count | fidelity | score | comment |
-| vqc_F1_all_wise_init_0 | 1 |  79 | 0.910 | 2.7805 | no_data_norm + qam_flatten, n_iter=200 |
-| vqc_F1_all_wise_init_0 | 2 | 157 | 0.949 | 2.8195 | no_data_norm + qam_flatten, n_iter=200 |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.956 | 2.8385 | no_data_norm + qam_flatten, n_iter=200 |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.959 | 2.8455 | no_data_norm + qam_flatten, n_iter=500 (⭐) |
-| vqc_F2_all_wise_init_0 | 2 | 289 | 0.973 | 2.8015 | no_data_norm + qam_flatten, n_iter=200 |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.951 | 2.8295 | no_data_norm + qam_flatten, n_iter=200, hwc order |
-[Local] (暂用基线clf，qcnn过拟合了更烂)
-  classifier gate count: 14400
-  test fid: 0.959
-  test acc: 0.420
-  test gates: 145.000
-  runtime: 15.562
-  客观得分: 336.131
-
-[Trail 3] std_flatten + data_norm (we'are fucking back!)
-| encoder | n_layer | gate count | fidelity | score | comment |
-| vqc_F2_all_wise_init_0 | 1 | 145 | 0.846 | 2.6195 | data_norm + std_flatten |
-| vqc_F2_all_wise_init_0 | 2 | 289 | 0.919 | 2.6935 | data_norm + std_flatten |
-😈 分类模型使用 qcnn，离奇的是训练时验证集精度仍然在 42% 左右，测试精度 39.4%
-难道任何 ansatz 结构无论在 std 还是 qam 展开方式下，最高精度都突破不了这个神秘数字 42%??
-
-[Trail 4] qam_flatten
-使用 F2_all 作分类器，使用 best_acc 检查点；相比基线减少了门数量，精度依然在瓶颈 42% 处
-[Local]
-  classifier gate count: 1452
-  test fid: 0.959 (qam_flatten + F2 layer=2)
-  test acc: 0.420 (F2 + best acc ckpt)
-  test gates: 145.000
-  runtime: 3.161
-  客观得分: 336.476
-[Submit]
-  Fidelity: 0.959
-  Accuracy: 0.420
-  振幅编码线路门的个数: 145.0
-  运行时间: 1.098531723022461
-  客观得分: 336.5330392784543
-
-[Trail 4] qam_flatten (overfit!)
-[Local]
-  classifier gate count: 1452 (F2_all nlayer=10)
-  test fid: 0.959
-  test acc: 0.424
-  test gates: 145.000
-  runtime: 3.118
-  客观得分: 336.877
------------------------
-  classifier gate count: 1772  (qcnn nlayer=8)
-  test fid: 0.959
-  test acc: 0.430
-  test gates: 145.000
-  runtime: 4.231
-  客观得分: 337.446
------------------------
-  classifier gate count: 5292 (real qcnn nlayer=24)
-  test fid: 0.959
-  test acc: 0.444
-  test gates: 145.000
-  runtime: 9.898
-  客观得分: 338.689
-[Submit]
-  classifier gate count: 1452 (F2_all nlayer=10)
-  Fidelity: 0.959
-  Accuracy: 0.424
-  振幅编码线路门的个数: 145.0
-  运行时间: 1.0803706645965576
-  客观得分: 336.9335445629226
------------------------
-  xxx
------------------------
-  classifier gate count: 5292
-  Fidelity: 0.959
-  Accuracy: 0.444
-  振幅编码线路门的个数: 145.0
-  运行时间: 3.3697571754455566
-  客观得分: 338.86995156606037
-
-[Trail 5] no_data_norm + std_flatten (overfit!)
-enc:
-  | encoder | n_layer | gate count | fidelity | score | comment |
-  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.959 | 2.8455   | no_data_norm + std_flatten, n_iter=500 |
-  | vqc_F2_all_wise_init_0 | 1 | 145     | 0.966 | 2.8595   | no_data_norm + std_flatten, n_iter=500 |
-  | vqc_F2_all_wise_init_0 | 1 | 101.446 | 0.961 | 2.871277 | no_data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
-clf:
-  | vqc | acc |
-  | qcnn     (nlayer=8)  | 42.8% |
-  | F2_all_0 (nlayer=10) | 34.0% |
-  | U-V brick (nlayer=8) | 43.4% |
-[Local]
-  classifier gate count: 1772
-  test fid: 0.966
-  test acc: 0.428
-  test gates: 145.000
-  runtime: 3.512
-  客观得分: 338.730
------------------------
-  classifier gate count: 1772
-  test fid: 0.961
-  test acc: 0.428
-  test gates: 101.446
-  runtime: 3.433
-  客观得分: 339.793
------------------------
-  classifier gate count: 1224
-  test fid: 0.961
-  test acc: 0.434
-  test gates: 101.446
-  runtime: 2.380
-  客观得分: 340.422
-[Submit]
-  xxx
------------------------
-  classifier gate count: 1772
-  Fidelity: 0.961
-  Accuracy: 0.428
-  振幅编码线路门的个数: 101.446
-  运行时间: 1.1226468086242676
-  客观得分: 339.8572680920283
------------------------
-  classifier gate count: 1224
-  Fidelity: 0.961
-  Accuracy: 0.434
-  振幅编码线路门的个数: 101.446
-  运行时间: 0.7958643436431885
-  客观得分: 340.46634361842473
-
-[Trail 6] data_norm + std_flatten (遵守游戏规则！😈)
-enc:
-  | encoder | n_layer | gate count | fidelity | score | comment |
-  | vqc_F2_all_wise_init_0 | 1 | 116.982 | 0.849 | 2.639509 | data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
-  | vqc_F2_all_wise_init_0 | 2 | 200.908 | 0.921 | 2.741546 | data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
-  | vqc_F2_all_wise_init_0 | 3 | 286.830 | 0.947 | 2.750585 | data_norm + std_flatten, n_iter=400(use_finetune=3:1) |
 ```
+
+⚪ AmpEnc results
+
+ℹ 一般而言，需达到 `fid=0.95` 左右，可视化为图像才看起来有人类可识别的同一性；另可参考 [wtf-quantum-fidelity](https://github.com/Kahsolt/wtf-quantum-fidelity)  
+⚠ 须注意：编码保真度与分类精度的相关性很弱，即 enc 和 clf 两者并不解耦 (因为振幅编码仅保留了数据的余弦相似度信息，可以说局域性信息已破坏殆尽)；因此必须先确定好编码方案，才能着手研究分类器！  
+
+> enc_score = 2 * fid + (1 - gcnt / 2000)
+
+| enc(n_layer) | gcnt | fid | enc_score | comment |
+| :-: | :-: | :-: | :-: | :-: |
+| F1(1) |  79     | 0.930 | 2.8205   | no_norm, n_iter=200 |
+| F1(2) | 157     | 0.954 | 2.8295   | no_norm, n_iter=200 |
+| F1(3) | 235     | 0.965 | 2.8125   | no_norm, n_iter=200 |
+| F2(1) | 145     | 0.966 | 2.8595   | no_norm, n_iter=500 |
+| F2(1) | 101.446 | 0.961 | 2.871277 | no_norm, n_iter=400(use_finetune=3:1) (⭐) |
+| F2(1) | 145     | 0.846 | 2.6195   |    norm, n_iter=500 |
+| F2(2) | 289     | 0.919 | 2.6935   |    norm, n_iter=500 |
+| F2(1) | 116.982 | 0.849 | 2.639509 |    norm, n_iter=400(use_finetune=3:1) |
+| F2(2) | 200.908 | 0.921 | 2.741546 |    norm, n_iter=400(use_finetune=3:1) |
+| F2(3) | 286.830 | 0.947 | 2.750585 |    norm, n_iter=400(use_finetune=3:1) (⭐) |
+
+⚪ clf results
+
+> total_score = (2 * fid + (1 - gcnt / 2000) + acc + 0.1) * 100
+
+TODO: enc 和 clf 部分都还可以加大优化步数
+
+| enc ckpt | clf(n_layer) | gcnt/pcnt | acc | ~total_score | comment |
+| :-: | :-: | :-: | :-: | :-: | :-: |
+| F2(1) [score:2.871277] | U-V brick(8)  | 1224/1656 | 43.4% | 340.5277 | overfit, no_norm |
+| F2(1) [score:2.871277] | U-V brick(10) | 1512/2052 | 54.6% | 351.7277 | overfit, no_norm, contrastive-learning |
+| F2(3) [score:2.750585] | U-V brick(8)  | 1224/1656 |       |          | overfit,    norm |
+| F2(3) [score:2.750585] | U-V brick(10) | 1512/2052 | 59.6% | 344.6585 | overfit,    norm, contrastive-learning |
 
 
 ### 关于数据规范化の分析
 
+如果遵守这个游戏规则，编码问题将非常困难... 😈
+
 $$ \text{Use} \ \left| x \right> = \frac{x}{\lvert| x \rvert|} \ \text{or} \ \left| x \right> = \frac{x - \mu}{\lvert| x - \mu \rvert|} \ \text{?} $$
 
-|     | 非规范化数据 | 规范化数据 | comment |
-| :-: | :-: | :-: | :-: |
-| 分布 | 不对称            | 比较对称，均值0 | |
-| 符号 | 恒正，无需学习相位 | 有正有负，需要学习相位 | |
-| enc  | fid=0.954         | fid=0.70    | vqc_F1_all_wise_init_0(d=2) |
-| clf  | acc=~42%          | acc=46.667% | baseline |
+|     | 非规范化数据 | 规范化数据 |
+| :-: | :-: | :-: |
+| 分布 | 不对称，对分类器不利 | 比较对称，均值0；利好分类器 |
+| 符号 | 恒正，无需学习相位   | 有正有负，需要学习相位 |
+| enc(best) | score=2.871277 | score=2.750585 |
 
 规范化数据の内积，`sqrt(保真度/余弦相似度)`:
 
@@ -244,22 +112,8 @@ $$
 - 无偏置无激活的极简卷积模型 `cnn_d1_s2_nb` 精度为 `52.4%`，精度稍欠但参数量确实少
 - 无偏置无激活的极简线性模型 `mlp1_nb` 精度为 `56.6%`
   - 模拟纯 ansatz 方法 `mlp0` 精度为 `53.2%`，任何单纯 ansatz 方法不应突破这个数字...
-  - 在配置 `data_norm + std_flatten` 下可以达到精度 `57.8%`!! 我们真的还需要 qam_flatten 吗??
+  - 在配置 `data_norm` 下可以达到精度 `57.8%`!! 我们真的还需要 qam_flatten 吗??
 - **卷积模型不如线性模型那样容易在 circuit 上实现**
-
-⚪ 理想模拟结果
-
-| settings | amp_enc fid/gcnt actual | `mlp0` acc expected | maximun score expected |
-| :-: | :-: | :-: | :-: |
-|    data_norm + std_flatten |           | 57.8% |  |
-|    data_norm + qam_flatten |           | 57.6% |  |
-| no_data_norm + std_flatten | 0.966/145 | 53.2% | 3.3915 |
-| no_data_norm + qam_flatten | 0.959/145 | 52.8% | 3.3735 |
-
-讨论:
-
-- flatten 方式不太改变线性模型的精度，甚至我们根本不需要 qam_flatten 呜呜呜。。。 :(
-- 但 data_norm 确实很影响编码保真度
 
 
 #### reference
