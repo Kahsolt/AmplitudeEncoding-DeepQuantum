@@ -719,6 +719,152 @@ class QuantumNeuralNetworkCL(nn.Module):
         return F.softmax(fid_mat, dim=-1)           # [B, NC=5]
 
 
+# 量子-经典混合模型!!
+class QuantumNeuralNetworkCLMLP(nn.Module):
+
+    def __init__(self, num_qubits, num_layers):
+        super().__init__()
+        self.num_qubits = num_qubits
+        self.num_layers = num_layers
+        self.var_circuit = dq.QubitCircuit(num_qubits)
+        self.create_var_circuit()
+        self.mlp = nn.Sequential(
+            nn.Linear(36, 12),
+            nn.ReLU(),
+            nn.Linear(12, 5),
+        )
+
+    def create_var_circuit(self):
+        vqc = self.var_circuit
+
+        # n_layer=8,  gcnt=1772, pcnt=2412
+        if not 'qcnn':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=2
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wire_p1, wires):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                # layer1
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9) ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9) ; add_V(10, 11)
+                # layer2
+                add_U(1, 3) ; add_U(5, 7) ; add_U(9, 11)
+                add_U(3, 5) ; add_U(7, 9)
+                add_V(3, 5) ; add_V(7, 9)
+                # layer3
+                add_U(3, 7) ; add_V(3, 7)
+                add_U(7, 11) ; add_V(7, 11)
+            # fc
+            add_F([7, 11])
+
+        # n_layer=8,  gcnt=1164, pcnt=1164
+        if not 'F2_all_0':
+            ''' RY - [pairwise(F2) - RY], param zero init '''
+            nq = self.num_qubits
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
+                g.init_para([0.0])
+                vqc.add(g)
+            for _ in range(self.num_layers):
+                for i in range(nq-1):   # qubit order
+                    for j in range(i+1, nq):
+                        g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                        g.init_para([0.0])
+                        vqc.add(g)
+                        g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                        g.init_para([0.0])
+                        vqc.add(g)
+                for i in range(nq):
+                    g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
+                    g.init_para([0.0])
+                    vqc.add(g)
+
+        # n_layer=8,  gcnt=1224, pcnt=1656
+        # n_layer=10, gcnt=1512, pcnt=2052
+        if 'U-V brick':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                wire_p3 = wires[3:] + wires[:3]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=3
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p3):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10) ; add_U(11, 0)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9)  ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9)  ; add_V(10, 11)
+            # fc
+            add_F(list(range(12)))  # 后面不接 u3 更好
+
+        for i in range(self.num_qubits):
+            vqc.observable(i, 'x')
+            vqc.observable(i, 'y')
+            vqc.observable(i, 'z')
+
+        print('classifier gate count:', count_gates(vqc))
+
+    def forward(self, z:Tensor, y:Tensor):
+        self.var_circuit(state=z)
+        outputs = self.var_circuit.expectation()     # [B, M=36]
+        outputs = F.normalize(outputs, dim=-1)
+        logits = self.mlp(outputs)
+        loss = F.cross_entropy(logits, y)
+        return loss, logits
+
+    @torch.inference_mode()
+    def inference(self, z):
+        self.var_circuit(state=z)
+        outputs = self.var_circuit.expectation()    # [B, M=36]
+        outputs = F.normalize(outputs, dim=-1)
+        logits = self.mlp(outputs)
+        return logits                               # [B, NC=5]
+
+
 QuantumNeuralNetwork = QuantumNeuralNetworkCL
 
 

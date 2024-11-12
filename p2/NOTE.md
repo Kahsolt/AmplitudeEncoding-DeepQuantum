@@ -51,10 +51,13 @@ TODO: enc 和 clf 部分都还可以加大优化步数
 
 | enc ckpt | clf(n_layer) | gcnt/pcnt | acc | ~total_score | comment |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| F2(1) [score:2.871277] | U-V brick(8)  [Ansatz] | 1224/1656 | 44.4% | 341.5277 | overfit test, no_norm |
-| F2(1) [score:2.871277] | U-V brick(10) [CL]     | 1512/2232 | 56.2% | 353.2100 | overfit test, no_norm (most cheaty! 😈) |
-| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 59.6% | 344.6585 | overfit test,    norm |
-| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 46.4% | 331.4585 | train-test,      norm (most honesty! 👼) |
+| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 46.4% | 331.4585 |    norm, train-test (most honesty! 👼); 有13.2%的样本无法从理想训练集泛化来 |
+| F2(3) [score:2.750585] | U-V brick(10) [CLMLP]  | 1512/2561 | 55.4% | 340.4585 |    norm, train-test |
+| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 59.6% | 344.6585 |    norm, overfit |
+| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 60.6% | 357.7277 | no_norm, train-test (我们认为最合理而并不作弊的解决方案) |
+| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 85.0% | 382.1277 | no_norm, overfit (most cheaty! 😈); loss/acc 并未完全收敛 |
+| F2(1) [score:2.871277] | U-V brick(10) [CL]     | 1512/2232 | 56.2% | 353.2100 | no_norm, overfit |
+| F2(1) [score:2.871277] | U-V brick(8)  [Ansatz] | 1224/1656 | 44.4% | 341.5277 | no_norm, overfit |
 
 
 ### 关于数据规范化の分析
