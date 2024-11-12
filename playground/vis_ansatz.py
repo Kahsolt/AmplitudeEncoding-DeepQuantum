@@ -11,11 +11,12 @@
   - nq= 8, gcnt= 257, fid=0.99950
   - nq= 9, gcnt= 487, fid=0.99862 (预计需要511门)
   - nq=10, gcnt=1001, fid=0.99970 (预计需要1023门)
+  - 对于 F2_all 线路族: 只要 gcnt >= len(v)，则理论上应可完美拟合 (实践上基本可保证 fid>=0.999)
 - 稀疏向量对拟合更友好
   - normalize 会导致 MNIST 不再稀疏，更难拟合
   - 稀疏值聚集而连续比随机而零散更容易拟合
   - CIFAR10比MNSIT更容易拟合 (因为它含有大色块??!)
-- 关于拟合能力: 线路结构决定下限，门数量决定上限
+- 关于拟合能力: 线路结构决定下限，门/参数数量决定上限
 '''
 
 import os
@@ -1150,6 +1151,14 @@ if not 'nq=12':
     run_test(partial(vqc_F1_all_wise_init, 12, 2), lr=0.02, n_repeat=5, data_gen=rand_mock_cifar10)
     # gcnt=235, fid=0.22628, ts=257.779s
     run_test(partial(vqc_F1_all_wise_init, 12, 3), lr=0.02, n_repeat=5, data_gen=rand_mock_cifar10)
+
+  if '随机满输入，测试fid是否能达到理论上限':
+    ##(noplot) gcnt=1729, fid=0.85633, ts=415.403s
+    run_test(partial(vqc_F2_all_wise_init, 12, 12), lr=0.02, n_repeat=1)
+    ##(noplot) gcnt=2017, fid=0.90605, ts=487.935s
+    run_test(partial(vqc_F2_all_wise_init, 12, 14), lr=0.02, n_repeat=1)
+    ##(noplot) gcnt=4033, fid=0.99892, ts=977.955s
+    run_test(partial(vqc_F2_all_wise_init, 12, 28), lr=0.02, n_repeat=1)
 
 
 ''' The Mindspore Ansatz Zoo: https://www.mindspore.cn/mindquantum/docs/zh-CN/r0.9/algorithm/mindquantum.algorithm.nisq.html '''
