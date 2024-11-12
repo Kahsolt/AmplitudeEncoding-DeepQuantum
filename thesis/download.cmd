@@ -68,6 +68,12 @@ wget -nc https://arxiv.org/pdf/2107.03630v1.pdf
 REM Quantum convolutional neural network for classical data classification
 wget -nc https://arxiv.org/pdf/2108.00661.pdf
 
+REM Impact of Data Augmentation on QCNNs
+wgte -nc https://arxiv.org/pdf/2312.00358.pdf
+
+REM Multi-Class Quantum Convolutional Neural Networks
+wget -nc https://arxiv.org/pdf/2404.12741v1.pdf
+
 REM Quantum convolutional neural networks formulti-channel supervised learning
 wget -nc https://cqdmqd.yale.edu/sites/default/files/2024-03/QuantumConvolutionalNeuralNetworksForMultiChannelSupervisedLearning_0.pdf
 

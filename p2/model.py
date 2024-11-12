@@ -43,6 +43,7 @@ class QuantumNeuralNetworkAnsatz(nn.Module):
         """构建变分量子线路"""
 
         vqc = self.var_circuit
+        nq = self.num_qubits
 
         # n_layer=600, gcnt=14400, pcnt=7200
         if not 'baseline':
@@ -522,11 +523,105 @@ class QuantumNeuralNetworkAnsatz(nn.Module):
             vqc.observable(1, basis='z')
             vqc.observable(1, basis='x')
 
+        # n_layer=1, gcnt= 91, pcnt= 189; best overfit acc=35.8%
+        # n_layer=8, gcnt=728, pcnt=1512; best overfit acc=46.8%
+        if not 'qcnn arXiv:2312.00358':
+            # https://pennylane.ai/qml/demos/tutorial_learning_few_data/
+            for _ in range(self.num_layers):
+                # init
+                for i in range(nq): vqc.u3(i)
+                # block1
+                for i in range(0, nq, 2):
+                    vqc.rxx([i, i+1])
+                    vqc.ryy([i, i+1])
+                    vqc.rzz([i, i+1])
+                for i in range(nq): vqc.u3(i)
+                # block2
+                for i in range(1, nq-1, 2):
+                    vqc.rxx([i, i+1])
+                    vqc.ryy([i, i+1])
+                    vqc.rzz([i, i+1])
+                for i in range(1, nq-1): vqc.u3(i)
+                for i in range(0, nq, 2):   # pool, left qubits:[0, 2, 4, 6, 8, 10]
+                    vqc.u3(i, controls=i+1)
+                # block3
+                vqc.rxx([0,  2]) ; vqc.ryy([0,  2]) ; vqc.rzz([0,  2])
+                vqc.rxx([4,  6]) ; vqc.ryy([4,  6]) ; vqc.rzz([4,  6])
+                vqc.rxx([8, 10]) ; vqc.ryy([8, 10]) ; vqc.rzz([8, 10])
+                for i in [0, 2, 4, 6, 8, 10]: vqc.u3(i)
+                vqc.u3(0, controls= 2)  # pool, left qubits: [0,4,8]
+                vqc.u3(4, controls= 6)
+                vqc.u3(8, controls=10)
+            # meas
+            vqc.observable(0, 'z')
+            vqc.observable(0, 'x')
+            vqc.observable(4, 'z')
+            vqc.observable(4, 'x')
+            vqc.observable(8, 'z')
+
+        # gcnt=522, pcnt=696
+        # gcnt=608, pcnt=803 (layer5+layer6)
+        if not 'qcnn arXiv:2404.12741':
+            def add_F1(wires:List[int]):
+                for i in          wires:  vqc.ry(i)
+                for i in          wires:  vqc.rx(i, controls=(i-1+nq)%nq)
+                for i in          wires:  vqc.ry(i)
+                for i in reversed(wires): vqc.rx((i-1+nq)%nq, controls=i)
+
+            def add_F2(i:int, j:int):
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(i, j) ; vqc.ry(i) ; vqc.ry(j)
+                vqc.cnot(j, i) ; vqc.ry(j)
+                vqc.cnot(i, j)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_P(i:int, j:int):    # j是控制位，且舍弃j
+                vqc.rz(i, controls=j)
+                vqc.x(j)
+                vqc.rx(i, controls=j)
+
+            # layer1
+            add_F1([0, 1, 2, 3,  4,  5])
+            add_F1([6, 7, 8, 9, 10, 11])
+            add_F2(0, 1) ; add_F2(2, 3) ; add_F2(4, 5) ; add_F2(6, 7) ; add_F2(8, 9)  ; add_F2(10, 11)
+            add_F2(1, 2) ; add_F2(3, 4) ; add_F2(5, 6) ; add_F2(7, 8) ; add_F2(9, 10) ; add_F2(11, 0)
+            add_P(0, 1)  ; add_P(10, 11)
+            # layer2
+            add_F1([0, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+            add_F2(0, 2) ; add_F2(3, 4) ; add_F2(5, 6) ; add_F2(7, 8) ; add_F2(9, 10)
+            add_F2(2, 3) ; add_F2(4, 5) ; add_F2(6, 7) ; add_F2(8, 9) ; add_F2(10, 0)
+            add_P(2, 3)  ; add_P(8, 9)
+            # layer3
+            add_F1([0, 2, 4, 5, 6, 7, 8, 10])
+            add_F2(0, 2) ; add_F2(4, 5) ; add_F2(6, 7) ; add_F2(8, 10)
+            add_F2(2, 4) ; add_F2(5, 6) ; add_F2(7, 8) ; add_F2(10, 0)
+            add_P(4, 5)  ; add_P(6, 7)
+            # layer4
+            add_F1([0, 2, 4, 6, 8, 10])
+            add_F2(0, 2) ; add_F2(4, 6) ; add_F2(8, 10)
+            add_F2(2, 4) ; add_F2(6, 8) ; add_F2(10, 0)
+            if 'layer5 & layer6':
+                # layer5
+                add_P(0, 2) ; add_P(8, 10)
+                add_F1([0, 4, 6, 8])
+                add_F2(0, 4) ; add_F2(6, 8)
+                add_F2(4, 6) ; add_F2(8, 10)
+                # layer6
+                add_P(0, 4) ; add_P(6, 8)
+                add_F1([0, 6])
+                add_F2(0, 6)
+            # meas
+            vqc.observable(0, 'z')
+            vqc.observable(0, 'x')
+            vqc.observable(0, 'y')
+            vqc.observable(6, 'z')
+            vqc.observable(6, 'x')
+
         print('classifier gate count:', count_gates(vqc))
 
     def forward(self, z, y):
-        self.var_circuit(state=z)   
-        output = self.var_circuit.expectation()          
+        self.var_circuit(state=z)
+        output = self.var_circuit.expectation()
         return self.loss_fn(output, y), output
 
     @torch.inference_mode()
