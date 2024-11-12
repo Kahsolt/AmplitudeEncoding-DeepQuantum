@@ -15,7 +15,7 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from model import QuantumNeuralNetwork, QuantumNeuralNetworkAnsatz, QuantumNeuralNetworkCL
+from model import QuantumNeuralNetwork, QuantumNeuralNetworkAnsatz, QuantumNeuralNetworkAnsatzMLP, QuantumNeuralNetworkCL
 from utils import QCIFAR10Dataset, PerfectAmplitudeEncodingDataset
 
 # 设置随机种子
@@ -30,7 +30,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 
-def train_model(model:QuantumNeuralNetworkAnsatz, optimizer:optim.Optimizer, train_loader:DataLoader, valid_loader:DataLoader, num_epochs:int, output_dir:str, device='cpu'):
+def train_model(model:QuantumNeuralNetworkAnsatz, optimizer:optim.Optimizer, train_loader:DataLoader, valid_loader:DataLoader, num_epochs:int, output_dir:str, grad_acc:int=1, device='cpu'):
     model.to(device)
     print(f"参数量: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
@@ -59,10 +59,15 @@ def train_model(model:QuantumNeuralNetworkAnsatz, optimizer:optim.Optimizer, tra
         train_loss = 0.0
         train_acc = 0
         inner_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}', leave=False, position=1)
+        grad_acc_cnt = 0
         for x, y, z in inner_pbar:
             x, y, z = x.to(device), y.to(device), z.to(device)
             optimizer.zero_grad()
             loss, output = model(z, y)
+            if grad_acc > 1: loss = loss / grad_acc
+            grad_acc_cnt += 1
+            if grad_acc_cnt < grad_acc: continue
+            grad_acc_cnt = 0
             loss.backward()
             #total_norm = clip_grad_norm_(model.parameters(), float('inf'))  # Calculates the total norm value and clips gradients
             total_norm = 0
@@ -114,7 +119,7 @@ def train_model(model:QuantumNeuralNetworkAnsatz, optimizer:optim.Optimizer, tra
     plt.close()
 
 
-def train_model_cl(model:QuantumNeuralNetworkCL, optimizer:optim.Optimizer, train_loader:DataLoader, valid_loader:DataLoader, num_epochs:int, output_dir:str, device='cpu'):
+def train_model_cl(model:QuantumNeuralNetworkCL, optimizer:optim.Optimizer, train_loader:DataLoader, valid_loader:DataLoader, num_epochs:int, output_dir:str, grad_acc:int=1, device='cpu'):
     model.to(device)
     print(f"参数量: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
@@ -197,10 +202,17 @@ if __name__ == '__main__':
     # Settings
     DEVICE     = "cuda:0"
     OUTPUT_DIR = 'output'
-    NUM_LAYER  = 10      # todo: 修改为合适的配置
+    NUM_LAYER  = 8       # todo: 修改为合适的配置
     BATCH_SIZE = 32      # todo: 修改为合适的配置
     NUM_EPOCHS = 100     # [30, 100]
     OVERFIT    = True
+
+    if QuantumNeuralNetwork is QuantumNeuralNetworkAnsatzMLP:
+        grad_acc = BATCH_SIZE
+        BATCH_SIZE = 1
+        print('>> force apply batch_size by grad_acc for AnsatzMLP')
+    else:
+        grad_acc = 1
 
     if OVERFIT:      # 实验性地过拟合测试集，使用编码数据
         with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as fh:
@@ -236,6 +248,7 @@ if __name__ == '__main__':
         valid_loader,
         num_epochs=NUM_EPOCHS, 
         output_dir=OUTPUT_DIR,
+        grad_acc=grad_acc,
         device=DEVICE,
     )
     ts_end = time()

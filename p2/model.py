@@ -543,6 +543,115 @@ class QuantumNeuralNetworkAnsatz(nn.Module):
         return output
 
 
+# 实验：能用 ansatz-encoder-ansatz 结构充当 QMLP 吗？
+# 结论是不行，哎。。。
+class QuantumNeuralNetworkAnsatzMLP(nn.Module):
+
+    def __init__(self, num_qubits, num_layers):
+        super().__init__()
+        self.num_qubits = num_qubits
+        self.num_layers = num_layers
+        self.loss_fn = F.cross_entropy
+        self.var_circuit  = self.create_var_circuit1()
+        self.var_circuit2 = self.create_var_circuit2()
+
+    def get_ansatz(self, vqc:dq.QubitCircuit=None) -> dq.QubitCircuit:
+        vqc = vqc or dq.QubitCircuit(self.num_qubits)
+
+        # n_layer=6,  gcnt=936,  pcnt=1260; best overfit acc=39.8%
+        # n_layer=8,  gcnt=1224, pcnt=1656; best overfit acc=44.4% (meas xyz-01)
+        #                                   best overfit acc=41.0% (meas xyz-67)
+        #                                   best overfit acc=41.8% (meas z-all)
+        # n_layer=12, gcnt=1800, pcnt=2448; best overfit acc=41.6%
+        if 'U-V brick':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            def add_F(wires:List[int]): # fc, 沿用 CCQC (arXiv:1804.00633)
+                wire_p1 = wires[1:] + wires[:1]
+                wire_p3 = wires[3:] + wires[:3]
+                # stride=1
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p1):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+                # stride=3
+                for i in wires: vqc.u3(i)
+                for i, j in zip(wires, wire_p3):
+                    vqc.cnot(i, j)
+                    vqc.cnot(j, i)
+
+            for _ in range(self.num_layers):
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10) ; add_U(11, 0)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9)  ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9)  ; add_V(10, 11)
+            # fc
+            add_F(list(range(12)))  # 后面不接 u3 更好
+
+        return vqc
+
+    def get_encoder(self, vqc:dq.QubitCircuit=None) -> dq.QubitCircuit:
+        vqc = vqc or dq.QubitCircuit(self.num_qubits)
+        for i in range(self.num_qubits):
+            vqc.rz(i, encode=True)      # accept Z-axis measure
+            vqc.ry(i, encode=True)      # accept X-axis measure
+        return vqc
+
+    def create_var_circuit1(self):
+        # ansatz
+        vqc = self.get_ansatz()
+        # measure (hidden layer)
+        for i in range(self.num_qubits):
+            vqc.observable(i, basis='z')
+            vqc.observable(i, basis='x')
+        print('clf-ansatz1 gate count:', count_gates(vqc))
+        return vqc
+
+    def create_var_circuit2(self):
+        # encoder (reupload!)
+        vqc = self.get_encoder()
+        # ansatz
+        vqc = self.get_ansatz(vqc)
+        # measure (output layer)
+        vqc.observable(0, basis='z')
+        vqc.observable(0, basis='x')
+        vqc.observable(1, basis='z')
+        vqc.observable(1, basis='x')
+        vqc.observable(2, basis='z')
+        print('clf-ansatz2 gate count:', count_gates(vqc))
+        return vqc
+
+    def forward(self, z:Tensor, y:Tensor):
+        assert z.shape[0] == 1, 'QubitCircuit.encode() only support bs=1'
+        self.var_circuit(state=z)
+        hidden = self.var_circuit.expectation().flatten()       # [M=24]
+        self.var_circuit2.encode(hidden)
+        self.var_circuit2()
+        output = self.var_circuit2.expectation().unsqueeze(0)   # [B=1, NC=5]
+        return self.loss_fn(output, y), output
+
+    @torch.inference_mode
+    def inference(self, z:Tensor):
+        assert z.shape[0] == 1, 'QubitCircuit.encode() only support bs=1'
+        self.var_circuit(state=z)
+        hidden = self.var_circuit.expectation().flatten()       # [M=24]
+        self.var_circuit2.encode(hidden)
+        self.var_circuit2()
+        output = self.var_circuit2.expectation().unsqueeze(0)   # [B=1, NC=5]
+        return output
+
+
 # 对比学习!!
 class QuantumNeuralNetworkCL(nn.Module):
 
