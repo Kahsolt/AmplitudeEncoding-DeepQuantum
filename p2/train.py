@@ -202,7 +202,7 @@ if __name__ == '__main__':
     # Settings
     DEVICE     = "cuda:0"
     OUTPUT_DIR = 'output'
-    NUM_LAYER  = 10      # todo: 修改为合适的配置
+    NUM_LAYER  = 3       # todo: 修改为合适的配置
     BATCH_SIZE = 32      # todo: 修改为合适的配置
     NUM_EPOCHS = 100     # [30, 100]
     OVERFIT    = False

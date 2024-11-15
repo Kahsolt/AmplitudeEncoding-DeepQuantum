@@ -36,28 +36,34 @@ runtime: 111.535
 | F1(2) | 157     | 0.954 | 2.8295   | no_norm, n_iter=200 |
 | F1(3) | 235     | 0.965 | 2.8125   | no_norm, n_iter=200 |
 | F2(1) | 145     | 0.966 | 2.8595   | no_norm, n_iter=500 |
+| F2(3) | 236.164 | 0.985 | 2.851918 | no_norm, n_iter=800(use_finetune=3:1) |
 | F2(1) | 101.446 | 0.961 | 2.871277 | no_norm, n_iter=400(use_finetune=3:1) (⭐) |
 | F2(1) | 145     | 0.846 | 2.6195   |    norm, n_iter=500 |
 | F2(2) | 289     | 0.919 | 2.6935   |    norm, n_iter=500 |
 | F2(1) | 116.982 | 0.849 | 2.639509 |    norm, n_iter=400(use_finetune=3:1) |
 | F2(2) | 200.908 | 0.921 | 2.741546 |    norm, n_iter=400(use_finetune=3:1) |
-| F2(3) | 286.830 | 0.947 | 2.750585 |    norm, n_iter=400(use_finetune=3:1) (⭐) |
+| F2(3) | 286.830 | 0.947 | 2.750585 |    norm, n_iter=400(use_finetune=3:1) |
+| F2(3) | 287.730 | 0.951 | 2.758135 |    norm, n_iter=800(use_finetune=3:1) (⭐) |
 
 ⚪ clf results
 
 > total_score = (2 * fid + (1 - gcnt / 2000) + acc + 0.1) * 100
 
-TODO: enc 和 clf 部分都还可以加大优化步数
-
 | enc ckpt | clf(n_layer) | gcnt/pcnt | acc | ~total_score | comment |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 46.4% | 331.4585 |    norm, train-test (most honesty! 👼); 有13.2%的样本无法从理想训练集泛化来 |
-| F2(3) [score:2.750585] | U-V brick(10) [CLMLP]  | 1512/2561 | 55.4% | 340.4585 |    norm, train-test |
+| F2(3) [score:2.758135] | U-V brick(1)  [CL]     |  216/ 450 | 40.8% | 326.6135 |    norm, train-test |
+| F2(3) [score:2.758135] | U-V brick(2)  [CL]     |  360/ 648 | 48.2% | 334.0135 |    norm, train-test |
+| F2(3) [score:2.758135] | U-V brick(3)  [CL]     |  504/ 846 | 51.2% | 337.0135 |    norm, train-test; 仍有8.4%的样本无法从理想训练集泛化来 (⭐) |
+| F2(3) [score:2.758135] | U-V brick(4)  [CL]     |  648/1044 | 49.4% | 335.2135 |    norm, train-test |
+| F2(3) [score:2.758135] | U-V brick(6)  [CL]     |  936/1440 | 49.2% | 335.0135 |    norm, train-test |
+| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 46.4% | 331.4585 |    norm, train-test |
+| F2(3) [score:2.750585] | U-V brick(10) [CLMLP]  | 1512/2561 | 55.4% | 340.4585 |    norm, train-test; 追加 MLP 得泛化收益不大 |
 | F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 59.6% | 344.6585 |    norm, overfit |
-| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 60.6% | 357.7277 | no_norm, train-test (我们认为最合理而并不作弊的解决方案) |
+| F2(1) [score:2.871277] | U-V brick(3)  [CL]     |  504/ 846 | 44.0% | 341.1277 | no_norm, train-test (我们认为最合理而并不作弊的解决方案) |
+| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 60.6% | 357.7277 | no_norm, train-test |
 | F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 85.0% | 382.1277 | no_norm, overfit (most cheaty! 😈); loss/acc 并未完全收敛 |
 | F2(1) [score:2.871277] | U-V brick(10) [CL]     | 1512/2232 | 56.2% | 353.2100 | no_norm, overfit |
-| F2(1) [score:2.871277] | U-V brick(8)  [Ansatz] | 1224/1656 | 44.4% | 341.5277 | no_norm, overfit |
+| F2(1) [score:2.871277] | U-V brick(8)  [Ansatz] | 1224/1656 | 44.4% | 341.5277 | no_norm, overfit; 纯 Ansatz 方法很差，无法逼近理论 mlp0 |
 
 
 ### 关于数据规范化の分析

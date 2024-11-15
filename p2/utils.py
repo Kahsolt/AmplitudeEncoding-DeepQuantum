@@ -96,7 +96,7 @@ def reshape_norm_padding(x:Tensor) -> Tensor:
 cifar10_transforms = T.Compose([
     T.ToTensor(),
     # this is wrong!
-    #T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    T.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     # use this instead :)
     #T.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     # This is 5-class stats on trainset
@@ -258,9 +258,11 @@ def encode_single_data(data, debug:bool=False):
     # [n_rep=1] fid=0.849, gcnt=116.982, score=2.639509, timecost=1640s; n_iter=400(use_finetune=3:1), n_worker=16
     # [n_rep=2] fid=0.921, gcnt=200.908, score=2.741546, timecost=3373s; n_iter=400(use_finetune=3:1), n_worker=16
     # [n_rep=3] fid=0.947, gcnt=286.830, score=2.750585, timecost=5049s; n_iter=400(use_finetune=3:1), n_worker=16
+    # [n_rep=3] fid=0.951, gcnt=287.730, score=2.758135, timecost=8858s; n_iter=800(use_finetune=3:1), n_worker=16
     # std flatten:
     # [n_rep=1] fid=0.966, gcnt=145, timecost=2131s; n_iter=500, n_worker=16
     # [n_rep=1] fid=0.961, gcnt=101.446, timecost=1589s; n_iter=400(use_finetune=3:1), n_worker=16
+    # [n_rep=3] fid=0.985, gcnt=236.164, score=2.851918, timecost=8506s; n_iter=800(use_finetune=3:1), n_worker=16
     # qam flatten:
     # [n_rep=1] fid=0.956, gcnt=145, timecost=795s; n_iter=200, n_worker=16
     # [n_rep=1] fid=0.959, gcnt=145, timecost=1947s; n_iter=500, n_worker=16
@@ -286,6 +288,29 @@ def encode_single_data(data, debug:bool=False):
             for i in range(nq):
                 g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
                 g.init_para([0.0])
+                vqc.add(g)
+        return vqc
+
+    # std flatten (+data_norm):
+    # [n_rep=3] fid=0.949, gcnt=292.752, score=2.751624, timecost=14287s; n_iter=800(use_finetune=3:1), n_worker=16
+    def vqc_G2_all_wise_init_0(nq:int=12, n_rep:int=1):
+        ''' U3(single init) - [pairwise(F2) - U3], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        g = dq.U3Gate(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
+        g.init_para([0.0, 0.0, 0.0])
+        vqc.add(g)
+        for _ in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                for j in range(i+1, nq):
+                    g = dq.U3Gate(nqubit=nq, wires=j, controls=i, requires_grad=True)
+                    g.init_para([0.0, 0.0, 0.0])
+                    vqc.add(g)
+                    g = dq.U3Gate(nqubit=nq, wires=i, controls=j, requires_grad=True)
+                    g.init_para([0.0, 0.0, 0.0])
+                    vqc.add(g)
+            for i in range(nq):
+                g = dq.U3Gate(nqubit=nq, wires=i, requires_grad=True)
+                g.init_para([0.0, 0.0, 0.0])
                 vqc.add(g)
         return vqc
 
@@ -336,7 +361,7 @@ def encode_single_data(data, debug:bool=False):
             vqc.add(g)
         return vqc
 
-    n_iter = 400
+    n_iter = 800
     use_finetune = True
     encoding_circuit = vqc_F2_all_wise_init_0(12, 3)
     gate_count = count_gates(encoding_circuit)
