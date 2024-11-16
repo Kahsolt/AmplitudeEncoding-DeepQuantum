@@ -49,22 +49,28 @@ runtime: 111.535
 
 > total_score = (2 * fid + (1 - gcnt / 2000) + acc + 0.1) * 100
 
+**with data_norm:**
+
 | enc ckpt | clf(n_layer) | gcnt/pcnt | acc | ~total_score | comment |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| F2(3) [score:2.758135] | U-V brick(1)  [CL]     |  216/ 450 | 40.8% | 326.6135 |    norm, train-test |
-| F2(3) [score:2.758135] | U-V brick(2)  [CL]     |  360/ 648 | 48.2% | 334.0135 |    norm, train-test |
-| F2(3) [score:2.758135] | U-V brick(3)  [CL]     |  504/ 846 | 51.2% | 337.0135 |    norm, train-test |
-| F2(3) [score:2.758135] | U-V brick(3)  [CL]     |  504/ 846 | 52.2% | 338.0135 |    norm, train-test; 修复 ref_data 算法，仍有7.4%的样本无法从理想训练集泛化来 (⭐) |
-| F2(3) [score:2.758135] | U-V brick(4)  [CL]     |  648/1044 | 49.4% | 335.2135 |    norm, train-test |
-| F2(3) [score:2.758135] | U-V brick(6)  [CL]     |  936/1440 | 49.2% | 335.0135 |    norm, train-test |
-| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 46.4% | 331.4585 |    norm, train-test |
-| F2(3) [score:2.750585] | U-V brick(10) [CLMLP]  | 1512/2561 | 55.4% | 340.4585 |    norm, train-test; 追加 MLP 得泛化收益不大 |
-| F2(3) [score:2.750585] | U-V brick(10) [CL]     | 1512/2232 | 59.6% | 344.6585 |    norm, overfit |
-| F2(1) [score:2.871277] | U-V brick(3)  [CL]     |  504/ 846 | 44.0% | 341.1277 | no_norm, train-test (我们认为最合理而并不作弊的解决方案) |
-| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 60.6% | 357.7277 | no_norm, train-test |
-| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 85.0% | 382.1277 | no_norm, overfit (most cheaty! 😈); loss/acc 并未完全收敛 |
-| F2(1) [score:2.871277] | U-V brick(10) [CL]     | 1512/2232 | 56.2% | 353.2100 | no_norm, overfit |
-| F2(1) [score:2.871277] | U-V brick(8)  [Ansatz] | 1224/1656 | 44.4% | 341.5277 | no_norm, overfit; 纯 Ansatz 方法很差，无法逼近理论 mlp0 |
+| F2(3) [score:2.758135] | U-V brick(3)  [Ansatz] |  504/ 846 | 45.2% | 331.0135 | |
+| F2(3) [score:2.758135] | U-V brick(1)  [CL]     |  216/ 450 | 40.8% | 326.6135 | |
+| F2(3) [score:2.758135] | U-V brick(2)  [CL]     |  360/ 648 | 48.2% | 334.0135 | |
+| F2(3) [score:2.758135] | U-V brick(3)  [CL]     |  504/ 846 | 51.2% | 337.0135 | |
+| F2(3) [score:2.758135] | U-V brick(3)  [CL]     |  504/ 846 | 52.2% | 338.0135 | 修复 ref_data 算法，仍有7.4%的样本无法从理想训练集泛化来 (⭐) |
+| F2(3) [score:2.758135] | U-V brick(4)  [CL]     |  648/1044 | 49.4% | 335.2135 | |
+| F2(3) [score:2.758135] | U-V brick(6)  [CL]     |  936/1440 | 49.2% | 335.0135 | |
+| F2(3) [score:2.758135] | U-V brick(3)  [CLMLP]  |  504/1175 | 63.4% | 349.2135 | 逼近经典模型 mlp2 |
+
+**without data_norm:**
+
+| enc ckpt | clf(n_layer) | gcnt/pcnt | acc | ~total_score | comment |
+| :-: | :-: | :-: | :-: | :-: | :-: |
+| F2(1) [score:2.871277] | U-V brick(8)  [Ansatz] | 1224/1656 | 44.4% | 341.5277 | overfit; 纯 Ansatz 方法很差，无法逼近理论 mlp0 |
+| F2(1) [score:2.871277] | U-V brick(3)  [CL]     |  504/ 846 | 44.0% | 341.1277 | 我们认为最合理而并不作弊的解决方案 |
+| F2(1) [score:2.871277] | U-V brick(10) [CL]     | 1512/2232 | 56.2% | 353.2100 | overfit |
+| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 60.6% | 357.7277 | |
+| F2(1) [score:2.871277] | U-V brick(10) [CLMLP]  | 1512/2561 | 85.0% | 382.1277 | overfit; loss/acc 并未完全收敛 (most cheaty! 😈) |
 
 
 ### 关于数据规范化の分析
