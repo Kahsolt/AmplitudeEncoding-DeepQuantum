@@ -78,7 +78,7 @@ def validate_test_dataset(test_dataset):
 if __name__ == '__main__':
     DEVICE = "cuda:0"
     OUTPUT_DIR = "output"
-    BATCH_SIZE = 64    # todo: 修改为合适的配置
+    BATCH_SIZE = 512    # todo: 修改为合适的配置
 
     t0 = time()
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'rb') as file:

@@ -877,18 +877,24 @@ class QuantumNeuralNetworkCL(nn.Module):
 
     @torch.no_grad
     def mk_ref_qstate(self, ref_data:Dataset, device:str):
-        # 类中心的测量结果视作参考
-        y_x = {}
-        for _, y, x in ref_data:
-            x = x.real.flatten()
-            y = y.item()
-            if y not in y_x: y_x[y] = []
-            y_x[y].append(x)
-        y_x = sorted([(y, np.stack(xs, axis=-1).mean(axis=-1)) for y, xs in y_x.items()])
-        z = torch.from_numpy(np.stack([x for y, x in y_x], axis=0)).to(device=device, dtype=torch.complex64)
-        self.var_circuit(state=z)
-        outputs = self.var_circuit.expectation()
-        fake_qstate = F.normalize(outputs, dim=-1)
+        # 测量结果的类中心视作参考
+        ref_loader = DataLoader(ref_data, batch_size=512, shuffle=False, drop_last=False, pin_memory=False)
+        y_list, v_list = [], []
+        for _, y, x in ref_loader:
+            x = x.to(device)
+            self.var_circuit(state=x)
+            E = self.var_circuit.expectation()  # [B, M=36]
+            v = F.normalize(E, dim=-1)
+            v_list.append(v)
+            y_list.extend(y.numpy().tolist())
+        v_list = torch.cat(v_list, dim=0)   # [N=25000, M=36]
+        # 分组-聚合
+        y_v = {}
+        for y, v in zip(y_list, v_list):
+            if y not in y_v: y_v[y] = []
+            y_v[y].append(v)
+        y_v = sorted([(y, F.normalize(torch.stack(vs, dim=0).mean(dim=0), dim=-1)) for y, vs in y_v.items()])
+        fake_qstate = torch.stack([v for _, v in y_v], dim=0)   # [NC=5, M=36]
         fake_qstate.requires_grad = False
         self.ref_qstate = nn.Parameter(fake_qstate)
 

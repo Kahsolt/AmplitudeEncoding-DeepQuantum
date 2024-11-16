@@ -203,8 +203,9 @@ if __name__ == '__main__':
     DEVICE     = "cuda:0"
     OUTPUT_DIR = 'output'
     NUM_LAYER  = 3       # todo: 修改为合适的配置
-    BATCH_SIZE = 32      # todo: 修改为合适的配置
+    BATCH_SIZE = 128     # todo: 修改为合适的配置
     NUM_EPOCHS = 100     # [30, 100]
+    RESUME     = False
     OVERFIT    = False
 
     if QuantumNeuralNetwork is QuantumNeuralNetworkAnsatzMLP:
@@ -232,6 +233,11 @@ if __name__ == '__main__':
     # 创建一个量子神经网络模型
     model_config = {'num_qubits': 12, 'num_layers': NUM_LAYER}
     model = QuantumNeuralNetwork(**model_config)
+    save_fp = os.path.join(OUTPUT_DIR, "best_model.pt")
+    if RESUME and os.path.isfile(save_fp):
+        print(f'>> resume from {save_fp}')
+        state_dict = torch.load(save_fp)
+        model.load_state_dict(state_dict)
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # 将字典保存到文件中
