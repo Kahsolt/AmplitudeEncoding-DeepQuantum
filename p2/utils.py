@@ -253,18 +253,19 @@ def encode_single_data(data, debug:bool=False):
         return vqc
 
     # std flatten (+data_norm):
-    # [n_rep=1] fid=0.846, gcnt=145, timecost=869s; n_iter=200, n_worker=16
+    # [n_rep=1] fid=0.846, gcnt=145, timecost=869s;  n_iter=200, n_worker=16
     # [n_rep=2] fid=0.919, gcnt=289, timecost=1699s; n_iter=200, n_worker=16
     # [n_rep=1] fid=0.849, gcnt=116.982, score=2.639509, timecost=1640s; n_iter=400(use_finetune=3:1), n_worker=16
     # [n_rep=2] fid=0.921, gcnt=200.908, score=2.741546, timecost=3373s; n_iter=400(use_finetune=3:1), n_worker=16
     # [n_rep=3] fid=0.947, gcnt=286.830, score=2.750585, timecost=5049s; n_iter=400(use_finetune=3:1), n_worker=16
     # [n_rep=3] fid=0.951, gcnt=287.730, score=2.758135, timecost=8858s; n_iter=800(use_finetune=3:1), n_worker=16
+    # [n_rep=3] fid=0.949, gcnt=292.868, score=2.750686, timecost=8857s; n_iter=800(use_finetune=3:1), n_worker=16, +mse_loss
     # std flatten:
     # [n_rep=1] fid=0.966, gcnt=145, timecost=2131s; n_iter=500, n_worker=16
-    # [n_rep=1] fid=0.961, gcnt=101.446, timecost=1589s; n_iter=400(use_finetune=3:1), n_worker=16
+    # [n_rep=1] fid=0.961, gcnt=101.446, score=2.871277, timecost=1589s; n_iter=400(use_finetune=3:1), n_worker=16
     # [n_rep=3] fid=0.985, gcnt=236.164, score=2.851918, timecost=8506s; n_iter=800(use_finetune=3:1), n_worker=16
     # qam flatten:
-    # [n_rep=1] fid=0.956, gcnt=145, timecost=795s; n_iter=200, n_worker=16
+    # [n_rep=1] fid=0.956, gcnt=145, timecost=795s;  n_iter=200, n_worker=16
     # [n_rep=1] fid=0.959, gcnt=145, timecost=1947s; n_iter=500, n_worker=16
     # [n_rep=2] fid=0.973, gcnt=289, timecost=1573s; n_iter=200, n_worker=16
     # qam flatten (hwc order):
@@ -289,6 +290,40 @@ def encode_single_data(data, debug:bool=False):
                 g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
                 g.init_para([0.0])
                 vqc.add(g)
+        return vqc
+
+    def vqc_F2_all_wise_init_0_rev(nq:int=12, n_rep:int=1):
+        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        g = dq.Ry(nqubit=nq, wires=nq-1, requires_grad=True)   # only init wire 0
+        #g.init_para([np.pi/2])
+        g.init_para([2.4619188346815495])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+        vqc.add(g)
+        for _ in range(n_rep):
+            for i in reversed(range(1, nq)):   # qubit order
+                for j in reversed(range(0, i)):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        return vqc
+
+    def vqc_F2_sep_all_wise_init_0(nq:int=12, n_rep:int=1):
+        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        for _ in range(n_rep):
+            # channel |10...11>
+            g = dq.Ry(nqubit=nq, wires=11,              requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            g = dq.Ry(nqubit=nq, wires=10, controls=11, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            g = dq.Ry(nqubit=nq, wires=11, controls=10, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            g = dq.Ry(nqubit=nq, wires=10,              requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            # spatial |0...9>
+            for i in reversed(range(1, nq-2+1)):   # qubit order
+                for j in reversed(range(0, i)):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            for i in range(nq-2):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
         return vqc
 
     # std flatten (+data_norm):
@@ -363,6 +398,7 @@ def encode_single_data(data, debug:bool=False):
 
     n_iter = 800
     use_finetune = True
+    use_mse_loss = False
     encoding_circuit = vqc_F2_all_wise_init_0(12, 3)
     gate_count = count_gates(encoding_circuit)
     if is_show_gate_count:
@@ -374,13 +410,19 @@ def encode_single_data(data, debug:bool=False):
         finetune_iter = n_iter // 4
     else:
         train_iter    = n_iter
+    if use_mse_loss:
+        use_mse_iter  = n_iter // 2
     # 优化参数，使得线路能够制备出|x>
     target = reshape_norm_padding(image)
     optimizer = Adam(encoding_circuit.parameters(), lr=0.1)
     loss_list = []
-    for _ in range(train_iter):
+    for i in range(train_iter):
         state = encoding_circuit().unsqueeze(0)
-        loss = -get_fidelity(state, target)
+        loss_fid = -get_fidelity(state, target)
+        loss_mse = 0
+        if use_mse_loss and i < use_mse_iter:
+            loss_mse = F.mse_loss(state.real, target.real) * 1000
+        loss = loss_fid + loss_mse
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -420,7 +462,7 @@ def encode_single_data(data, debug:bool=False):
             #print('gate_count_prune:', gate_count_prune)
             gate_count = gate_count_prune
 
-    print('score:', get_score(-loss.item(), gate_count))
+    print('score:', get_score(-loss.item(), gate_count), 'fid:', -loss.item(), 'gcnt:', gate_count)
     # Detach the state tensor before returning
     return (image, label, encoding_circuit().detach(), gate_count)
 

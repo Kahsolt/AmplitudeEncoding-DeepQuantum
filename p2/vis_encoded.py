@@ -27,7 +27,7 @@ def run(args):
   for x, y, z_ in test_dataset:
     vec_z = z_.flatten().real
     if args.F == 'std':
-      vec_x = reshape_norm_padding(x, use_hijack=False)
+      vec_x = reshape_norm_padding(x).squeeze_(0)
       z = vec_z.reshape(-1, 32, 32)[:3, ...]
 
     im_x = img_to_01(x).permute([1, 2, 0]).numpy()
@@ -52,7 +52,7 @@ if __name__ == '__main__':
   parser.add_argument('-F', default='std', choices=['std'], help='flatten method')
   args = parser.parse_args()
 
-  print('WARN: 如果可视化图像看起来不对，请确认 -F 参数设置正确')
-  print('大端序/hwc格式目前没实现合适的 inv 函数，所以可视化就是不对的 :(')
+  #print('WARN: 如果可视化图像看起来不对，请确认 -F 参数设置正确')
+  #print('大端序/hwc格式目前没实现合适的 inv 函数，所以可视化就是不对的 :(')
 
   run(args)

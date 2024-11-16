@@ -1075,7 +1075,7 @@ class QuantumNeuralNetworkCLMLP(nn.Module):
         return logits                               # [B, NC=5]
 
 
-QuantumNeuralNetwork = QuantumNeuralNetworkCLMLP
+QuantumNeuralNetwork = QuantumNeuralNetworkCL
 
 
 if __name__ == '__main__':

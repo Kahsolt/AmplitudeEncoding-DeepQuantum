@@ -7,6 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 from tqdm import tqdm
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 
 from model import QuantumNeuralNetwork
 from utils import CIFAR10Dataset, reshape_norm_padding, get_fidelity, get_acc
@@ -24,6 +25,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 
+@torch.inference_mode
 def test_model(model, test_loader, device):
     """
     测试模型。
@@ -44,15 +46,14 @@ def test_model(model, test_loader, device):
     y_true = []
 
     model.to(device).eval()  # 切换到评估模式
-    with torch.no_grad():  # 不需要计算梯度
-        for x, y, z in tqdm(test_loader, desc="Testing"):
-            x, y, z = x.to(device), y.to(device), z.to(device)
-            output = model.inference(z)
+    for x, y, z in tqdm(test_loader, desc="Testing"):
+        x, y, z = x.to(device), y.to(device), z.to(device)
+        output = model.inference(z)
 
-            state_pred.append(z)
-            state_true.append(reshape_norm_padding(x))
-            y_pred.append(output)
-            y_true.append(y)
+        state_pred.append(z)
+        state_true.append(reshape_norm_padding(x))
+        y_pred.append(output)
+        y_true.append(y)
 
     state_pred = torch.cat(state_pred, dim=0)
     state_true = torch.cat(state_true, dim=0)
@@ -62,6 +63,18 @@ def test_model(model, test_loader, device):
     y_pred = torch.argmax(y_pred, dim=1)
     acc = get_acc(y_pred, y_true)
     fid = get_fidelity(state_pred, state_true)
+
+    y_true = y_true.cpu().numpy()
+    y_pred = y_pred.cpu().numpy()
+    acc = accuracy_score(y_true, y_pred)
+    prec, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='macro')
+    cmat = confusion_matrix(y_true, y_pred)
+    print('acc:', acc)
+    print('prec:', prec)
+    print('recall:', recall)
+    print('f1:', f1)
+    print(cmat)
+    print('-' * 32)
 
     return acc, fid.item(), test_loader.dataset.get_gates_count()
 
@@ -120,3 +133,8 @@ if __name__ == '__main__':
     runtime_score = 1 - runtime / 360.0
     score = (2 * fid + acc + gates_score + 0.1 * runtime_score) * 100
     print(f'客观得分: {score:.3f}')
+
+    print('-' * 32)
+    enc_sore = 2 * fid + 1 - gates / 2000
+    print(f'enc_sore: {enc_sore:.6f}')
+    print(f'total_sore: {(enc_sore + acc + 0.1) * 100:.6f}')
