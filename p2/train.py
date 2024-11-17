@@ -204,7 +204,7 @@ if __name__ == '__main__':
     OUTPUT_DIR = 'output'
     NUM_LAYER  = 3       # todo: 修改为合适的配置
     BATCH_SIZE = 128     # todo: 修改为合适的配置
-    NUM_EPOCHS = 100     # [30, 100]
+    NUM_EPOCHS = 75      # [30, 75]
     RESUME     = False
     OVERFIT    = False
 

@@ -1,2 +1,2 @@
-output.zip
-output.*
+!output
+output/src
