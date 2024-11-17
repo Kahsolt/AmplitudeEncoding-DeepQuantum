@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 
-from model import QuantumNeuralNetwork
+from model import QuantumNeuralNetwork, QuantumNeuralNetworkCLEnsemble, QuantumNeuralNetworkCLCascade
 from utils import CIFAR10Dataset, reshape_norm_padding, get_fidelity, get_acc
 from utils import QCIFAR10Dataset       # keep for unpickle
 
@@ -113,8 +113,15 @@ if __name__ == '__main__':
         model_config = pkl.load(file)
     model = QuantumNeuralNetwork(**model_config).to(DEVICE)
     
+    if QuantumNeuralNetwork is QuantumNeuralNetworkCLEnsemble:
+        fp = f'{OUTPUT_DIR}/best_model.ensemble.pt'
+    elif QuantumNeuralNetwork is QuantumNeuralNetworkCLCascade:
+        fp = f'{OUTPUT_DIR}/best_model.cascade.pt'
+    else:
+        fp = f'{OUTPUT_DIR}/best_model.pt'
+    print(f'load ckpt from {fp}')
+    model.load_state_dict(torch.load(fp, map_location=torch.device('cpu')))
     output = model.inference(z)
-    model.load_state_dict(torch.load(f'{OUTPUT_DIR}/best_model.pt', map_location=torch.device('cpu')))
 
     # 测试模型
     t0 = time()

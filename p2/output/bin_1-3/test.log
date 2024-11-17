@@ -1,0 +1,19 @@
+>> load pickle done (0.214s)
+len(testset): 200
+classifier gate count: 504
+acc: 0.86
+prec: 0.8601440576230492
+recall: 0.86
+f1: 0.8599859985998599
+[[85 15]
+ [13 87]]
+--------------------------------
+targets: [1, 3]
+test fid: 0.946
+test acc: 0.860
+test gates: 719.325
+runtime: 0.433
+客观得分: 349.245
+--------------------------------
+enc_sore: 2.532573
+total_sore: 349.257290

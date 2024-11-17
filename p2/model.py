@@ -1,7 +1,7 @@
 import os
 import random
 from collections import Counter
-from typing import List
+from typing import List, Tuple, Dict
 
 import torch
 import torch.nn as nn
@@ -921,12 +921,90 @@ class QuantumNeuralNetworkCL(nn.Module):
         loss = fid_ne - fid_eq
         return loss, fid_eq, fid_ne
 
-    @torch.inference_mode()
+    @torch.inference_mode
     def inference(self, z):
         self.var_circuit(state=z)
         outputs = self.var_circuit.expectation()    # [B, M=36]
-        fid_mat = self.postprocess(outputs)
-        return F.softmax(fid_mat, dim=-1)           # [B, NC=5]
+        fid_mat = self.postprocess(outputs)         # [B, NC=5]
+        return fid_mat
+
+
+# 对比学习-集成模型!!
+class QuantumNeuralNetworkCLEnsemble(nn.Module):
+
+    def __init__(self, num_qubits, num_layers):
+        super().__init__()
+
+        self.model2_grid = nn.ModuleDict()
+        for i in range(4):
+            for j in range(i+1, 5):
+                self.model2_grid[f'bin_{i}-{j}'] = QuantumNeuralNetworkCL(num_qubits, num_layers)
+        for model2 in self.model2_grid.values():
+            model2: QuantumNeuralNetworkCL
+            model2.ref_qstate = nn.Parameter(torch.zeros([2, 36], requires_grad=False))
+
+    @torch.inference_mode
+    def inference(self, z:Tensor):
+        votes2_list: List[Tensor] = []
+        for i in range(4):
+            for j in range(i+1, 5):
+                model: QuantumNeuralNetworkCL = self.model2_grid[f'bin_{i}-{j}']
+                raw_preds: Tensor = model.inference(z).argmax(-1).cpu()     # [B]
+                key = (i, j)
+                # https://discuss.pytorch.org/t/mapping-values-in-a-tensor/117731
+                preds = raw_preds.apply_(lambda p: key[p])
+                votes2_list.append(preds)
+
+        # https://stackoverflow.com/questions/16330831/most-efficient-way-to-find-mode-in-numpy-array
+        votes = np.stack(votes2_list, axis=-1)   # [B, V=10]
+        preds = np.apply_along_axis(lambda x: np.bincount(x).argmax(), axis=1, arr=votes)
+        preds = torch.from_numpy(preds).to(z.device)
+
+        # 输出必须是 [B, NC=5]
+        return F.one_hot(preds, num_classes=5).to(torch.float32)
+
+
+# 对比学习-级联模型!!
+class QuantumNeuralNetworkCLCascade(nn.Module):
+
+    def __init__(self, num_qubits, num_layers):
+        super().__init__()
+
+        self.model5 = QuantumNeuralNetworkCL(num_qubits, num_layers)
+        self.model2_grid = nn.ModuleDict()
+        for i in range(4):
+            for j in range(i+1, 5):
+                self.model2_grid[f'bin_{i}-{j}'] = QuantumNeuralNetworkCL(num_qubits, num_layers)
+        for model2 in self.model2_grid.values():
+            model2: QuantumNeuralNetworkCL
+            model2.ref_qstate = nn.Parameter(torch.zeros([2, 36], requires_grad=False))
+
+    @torch.inference_mode
+    def inference(self, z:Tensor):
+        # phase model5
+        fid_mat = self.model5.inference(z)  # [B, NC=5]
+        logits, preds_top2 = torch.topk(fid_mat, k=2)
+        preds_top1 = preds_top2[:, 0]
+        # phase model2
+        sort = lambda x, y: (x, y) if x <= y else (y, x)
+        grp_X: Dict[Tuple[int, int], List[Tensor]] = {}
+        grp_I: Dict[Tuple[int, int], List[int]]    = {}
+        for idx, (s, p) in enumerate(zip(z, preds_top2)):
+            key = sort(*p.cpu().numpy().tolist())
+            if key not in grp_X: grp_X[key] = []
+            if key not in grp_I: grp_I[key] = []
+            grp_X[key].append(s)
+            grp_I[key].append(idx)
+        grp_X = {k: torch.stack(v, dim=0) for k, v in grp_X.items()}
+        grp_res = {k: self.model2_grid[f'bin_{k[0]}-{k[1]}'].inference(v).argmax(dim=-1) for k, v in grp_X.items() }
+        preds = preds_top1.clone()  # [B]
+        for k in grp_res:
+            res = grp_res[k]
+            idx = grp_I  [k]
+            for i, p in zip(idx, res):
+                preds[i] = k[p]     # [0,1] to real label
+        # 输出必须是 [B, NC=5]
+        return F.one_hot(preds, num_classes=5)
 
 
 # 量子-经典混合模型!!
@@ -1075,7 +1153,7 @@ class QuantumNeuralNetworkCLMLP(nn.Module):
         return logits                               # [B, NC=5]
 
 
-QuantumNeuralNetwork = QuantumNeuralNetworkCL
+QuantumNeuralNetwork = QuantumNeuralNetworkCLEnsemble
 
 
 if __name__ == '__main__':
