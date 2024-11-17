@@ -67,7 +67,7 @@ def test_model(model, test_loader, device):
     y_true = y_true.cpu().numpy()
     y_pred = y_pred.cpu().numpy()
     acc = accuracy_score(y_true, y_pred)
-    prec, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='macro')
+    prec, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='macro', zero_division=np.nan)
     cmat = confusion_matrix(y_true, y_pred)
     print('acc:', acc)
     print('prec:', prec)

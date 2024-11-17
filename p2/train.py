@@ -60,8 +60,8 @@ def train_model(model:QuantumNeuralNetworkAnsatz, optimizer:optim.Optimizer, tra
         train_acc = 0
         inner_pbar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs}', leave=False, position=1)
         grad_acc_cnt = 0
-        for x, y, z in inner_pbar:
-            x, y, z = x.to(device), y.to(device), z.to(device)
+        for _, y, z in inner_pbar:
+            y, z = y.to(device), z.to(device)
             optimizer.zero_grad()
             loss, output = model(z, y)
             if grad_acc > 1: loss = loss / grad_acc
@@ -89,8 +89,8 @@ def train_model(model:QuantumNeuralNetworkAnsatz, optimizer:optim.Optimizer, tra
         valid_loss = 0.0
         valid_acc = 0
         with torch.no_grad():
-            for x, y, z in valid_loader:
-                x, y, z = x.to(device), y.to(device), z.to(device)
+            for _, y, z in valid_loader:
+                y, z = y.to(device), z.to(device)
                 loss, output = model(z, y)
                 valid_loss += loss.item() * y.size(0)
                 valid_acc += (output.argmax(-1) == y).sum().item()
