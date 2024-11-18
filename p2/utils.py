@@ -236,20 +236,14 @@ def encode_single_data(data, debug:bool=False):
     def vqc_F1_all_wise_init_0(nq:int=12, n_rep:int=1):
         ''' RY(single init) - [pairwise(F1) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)
-        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
-        #g.init_para([np.pi/2])
-        g.init_para([2.4619188346815495])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
-        vqc.add(g)
+        # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747, only init wire 0
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True) ; g.init_para([2.4619188346815495]) ; vqc.add(g)
         for _ in range(n_rep):
             for i in range(nq-1):   # qubit order
                 for j in range(i+1, nq):
-                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
-                    g.init_para([0.0])
-                    vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
             for i in range(nq):
-                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
-                g.init_para([0.0])
-                vqc.add(g)
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
         return vqc
 
     # std flatten (+data_norm):
@@ -273,129 +267,165 @@ def encode_single_data(data, debug:bool=False):
     def vqc_F2_all_wise_init_0(nq:int=12, n_rep:int=1):
         ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)
-        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
-        #g.init_para([np.pi/2])
-        g.init_para([2.4619188346815495])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
-        vqc.add(g)
+        # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747, only init wire 0
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True) ; g.init_para([2.4619188346815495]) ; vqc.add(g)
         for _ in range(n_rep):
             for i in range(nq-1):   # qubit order
                 for j in range(i+1, nq):
-                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
-                    g.init_para([0.0])
-                    vqc.add(g)
-                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
-                    g.init_para([0.0])
-                    vqc.add(g)
-            for i in range(nq):
-                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
-                g.init_para([0.0])
-                vqc.add(g)
-        return vqc
-
-    def vqc_F2_all_wise_init_0_rev(nq:int=12, n_rep:int=1):
-        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
-        vqc = dq.QubitCircuit(nqubit=nq)
-        g = dq.Ry(nqubit=nq, wires=nq-1, requires_grad=True)   # only init wire 0
-        #g.init_para([np.pi/2])
-        g.init_para([2.4619188346815495])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
-        vqc.add(g)
-        for _ in range(n_rep):
-            for i in reversed(range(1, nq)):   # qubit order
-                for j in reversed(range(0, i)):
                     g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
                     g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
             for i in range(nq):
                 g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
         return vqc
 
-    def vqc_F2_sep_all_wise_init_0(nq:int=12, n_rep:int=1):
-        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+    # 用 ReconfigurableBeamSplitter 门实现 F2 门，因为参数耦合而更差
+    # nlayer=5, gcnt=391
+    def vqc_RBS_all_wise_init_0(nq:int=12, n_rep:int=1):
+        ''' RY(single init) - [pairwise(RBS) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)
-        for _ in range(n_rep):
-            # channel |10...11>
-            g = dq.Ry(nqubit=nq, wires=11,              requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
-            g = dq.Ry(nqubit=nq, wires=10, controls=11, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
-            g = dq.Ry(nqubit=nq, wires=11, controls=10, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
-            g = dq.Ry(nqubit=nq, wires=10,              requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
-            # spatial |0...9>
-            for i in reversed(range(1, nq-2+1)):   # qubit order
-                for j in reversed(range(0, i)):
-                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
-                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
-            for i in range(nq-2):
-                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
-        return vqc
-
-    # std flatten (+data_norm):
-    # [n_rep=3] fid=0.949, gcnt=292.752, score=2.751624, timecost=14287s; n_iter=800(use_finetune=3:1), n_worker=16
-    def vqc_G2_all_wise_init_0(nq:int=12, n_rep:int=1):
-        ''' U3(single init) - [pairwise(F2) - U3], param zero init '''
-        vqc = dq.QubitCircuit(nqubit=nq)
-        g = dq.U3Gate(nqubit=nq, wires=0, requires_grad=True)   # only init wire 0
-        g.init_para([0.0, 0.0, 0.0])
-        vqc.add(g)
+        # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747, only init wire 0
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True) ; g.init_para([2.4619188346815495]) ; vqc.add(g)
         for _ in range(n_rep):
             for i in range(nq-1):   # qubit order
                 for j in range(i+1, nq):
-                    g = dq.U3Gate(nqubit=nq, wires=j, controls=i, requires_grad=True)
-                    g.init_para([0.0, 0.0, 0.0])
-                    vqc.add(g)
-                    g = dq.U3Gate(nqubit=nq, wires=i, controls=j, requires_grad=True)
-                    g.init_para([0.0, 0.0, 0.0])
-                    vqc.add(g)
+                    g = dq.ReconfigurableBeamSplitter(nqubit=nq, wires=[i, j], requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
             for i in range(nq):
-                g = dq.U3Gate(nqubit=nq, wires=i, requires_grad=True)
-                g.init_para([0.0, 0.0, 0.0])
-                vqc.add(g)
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
         return vqc
 
-    # std flatten:
-    # [n_rep=1] fid=0.962, gcnt=156, timecost=2224s; n_iter=500, n_worker=16
+    # 去掉 F2_all 中间的 RY 层，更差；不能通过精简 F2_all 来涨分了！！
+    # nlayer=3, gcnt=409
+    def vqc_F2_all_wise_init_0_lit(nq:int=12, n_rep:int=1):
+        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747, only init wire 0
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True) ; g.init_para([2.4619188346815495]) ; vqc.add(g)
+        for _ in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                for j in range(i+1, nq):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        for i in range(nq):
+            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        return vqc
+
+    # F2_all 第一层使用 RY 层；更差
+    # nlayer=3, gcnt=444
     def vqc_F2_all_init_0(nq:int=12, n_rep:int=1):
         ''' RY - [pairwise(F2) - RY], param zero init '''
         vqc = dq.QubitCircuit(nqubit=nq)    # init all
         for i in range(nq):
-            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
-            g.init_para([0.0])
-            vqc.add(g)
+            # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([2.4619188346815495 if i == 0 else 0.0]) ; vqc.add(g)
         for _ in range(n_rep):
             for i in range(nq-1):   # qubit order
                 for j in range(i+1, nq):
-                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
-                    g.init_para([0.0])
-                    vqc.add(g)
-                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
-                    g.init_para([0.0])
-                    vqc.add(g)
-        for i in range(nq):
-            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
-            g.init_para([0.0])
-            vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
         return vqc
 
-    # std flatten:
-    # [n_rep=1] fid=0.966, gcnt=155, timecost=2219s; n_iter=500, n_worker=16
+    # F2_all 第一层使用 惰性初始化的 RY 层；更差
+    # nlayer=3, gcnt=444
     def vqc_F2_all_lazy_init_0(nq:int=12, n_rep:int=1):
         ''' RY_pairwise(F2) - RY, param zero init '''
-        assert n_rep == 1
         vqc = dq.QubitCircuit(nqubit=nq)
-        for i in range(nq-1):   # qubit order
-            g = dq.Ry(nqubit=nq, wires=0, requires_grad=True)
-            g.init_para([2.4619188346815495 if i == 0 else 0.0])   # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
-            vqc.add(g)
-            for j in range(i+1, nq):
-                g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True)
-                g.init_para([0.0])
-                vqc.add(g)
-                g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True)
-                g.init_para([0.0])
-                vqc.add(g)
-        for i in range(nq):
-            g = dq.Ry(nqubit=nq, wires=i, requires_grad=True)
-            g.init_para([0.0])
-            vqc.add(g)
+        for rep in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                if rep == 0:        # init all (lazy)
+                    # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747
+                    g = dq.Ry(nqubit=nq, wires=0, requires_grad=True) ; g.init_para([2.4619188346815495 if i == 0 else 0.0]) ; vqc.add(g)
+                for j in range(i+1, nq):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
         return vqc
 
+    # F2_all 第一层使用 H；更差
+    # nlayer=3, gcnt=445
+    def vqc_F2_all_init_H_0(nq:int=12, n_rep:int=1):
+        ''' RY - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)    # init all
+        for i in range(nq): g = dq.Hadamard(nqubit=nq, wires=i) ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        for _ in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                for j in range(i+1, nq):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        return vqc
+
+    # 此结构可保证向量末尾接近0，但由于无法作为 trash_bin 来平衡振幅了，故保真度通常会差很多 :(
+    # nlayer=4, gcnt=406
+    def vqc_F2_sep_wise_init_0(nq:int=12, n_rep:int=1):
+        ''' RY(wise_init) - [intra_inter_pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        half = nq // 2
+        # channel |0...1>
+        g = dq.Ry(nqubit=nq, wires=0,             requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=1, controls=0, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=0, controls=1, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=1,             requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        # spatial init (row/col-0)
+        g = dq.Ry(nqubit=nq, wires=0,             requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=half,          requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        # spatial |2...11>
+        for _ in range(n_rep):
+            # intra-group row |2...5>
+            for i in range(2, half-1):   # qubit order
+                for j in range(i+1, half):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            # intra-group col |6...11>
+            for i in range(half, 2*half-1):   # qubit order
+                for j in range(i+1, 2*half):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            # inter-group |2...5> and |6...11>, crossing row & col
+            for i in range(2, half):
+                for j in range(half, 2*half):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            # spatial |2...11>
+            for i in range(2, nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        return vqc
+
+    # 参数规格基本与 F2_all 一致，只是 F2 门排列顺序不一样，比 F2_all 保真度差 :(
+    # nlayer=3, gcnt=434
+    def vqc_F2_sep_wise_init_0_allow_trash(nq:int=12, n_rep:int=1):
+        ''' RY(wise_init) - [intra_inter_pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        half = nq // 2
+        # spatial init (row/col-0)
+        g = dq.Ry(nqubit=nq, wires=0,    requires_grad=True) ; g.init_para([2.4619188346815495]) ; vqc.add(g)
+        g = dq.Ry(nqubit=nq, wires=half, requires_grad=True) ; g.init_para([np.pi/2])            ; vqc.add(g)
+        # all |0...11>
+        for _ in range(n_rep):
+            # intra-group row |0...5>
+            for i in range(half-1):   # qubit order
+                for j in range(i+1, half):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            # intra-group col |6...11>
+            for i in range(half, 2*half-1):   # qubit order
+                for j in range(i+1, 2*half):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            # inter-group |0...5> and |6...11>, crossing row & col
+            for i in range(half):
+                for j in range(half, 2*half):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            # all |0...11>
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        return vqc
+ 
     n_iter = 800
     use_finetune = True
     use_mse_loss = False
