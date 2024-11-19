@@ -311,7 +311,7 @@ def vqc_F2_all(nq:int, n_rep:int=1, wise_init:bool=False):
       vqc.ry(wires=i)
   return vqc
 
-vqc_F2_all_wise_init = lambda nq, n_rep: vqc_F2_all(nq, n_rep, wise_init=True)
+vqc_F2_all_wise_init = lambda nq, n_rep=1: vqc_F2_all(nq, n_rep, wise_init=True)
 
 def vqc_F2_all_gap_order_wise_init(nq:int, n_rep:int=1):
   ''' RY(single init) - [pairwise(F2, gap_order) - RY] '''
@@ -641,6 +641,9 @@ if not 'nq=2':
   # fid=1.00000, ts=27.421s
   run_test(vqc_ex)
 
+  # gcnt=5, fid=1.0
+  run_test(partial(vqc_F2_all_wise_init, 2))
+
 if not 'nq=3':
   def vqc():
     '''
@@ -786,6 +789,9 @@ if not 'nq=3':
   run_test(vqc_ex_red_ex_red_ex)
   # fid=0.99301, ts=54.474s
   run_test(vqc_ex_red_ex_red_ex_red)
+
+  # gcnt=10, fid=0.99986
+  run_test(partial(vqc_F2_all_wise_init, 3))
 
 if not 'nq=4':
   def vqc():
