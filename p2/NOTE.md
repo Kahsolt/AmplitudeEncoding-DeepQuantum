@@ -32,19 +32,20 @@ runtime: 111.535
 
 | enc(n_layer) | gcnt | fid | enc_score | comment |
 | :-: | :-: | :-: | :-: | :-: |
-| F1(1) |  79     | 0.930 | 2.8205   | no_norm, n_iter=200 |
-| F1(2) | 157     | 0.954 | 2.8295   | no_norm, n_iter=200 |
-| F1(3) | 235     | 0.965 | 2.8125   | no_norm, n_iter=200 |
-| F2(1) | 145     | 0.966 | 2.8595   | no_norm, n_iter=500 |
-| F2(3) | 236.164 | 0.985 | 2.851918 | no_norm, n_iter=800(use_finetune=3:1) |
-| F2(1) | 101.446 | 0.961 | 2.871277 | no_norm, n_iter=400(use_finetune=3:1) (⭐) |
-| F2(1) | 145     | 0.846 | 2.6195   |    norm, n_iter=500 |
-| F2(2) | 289     | 0.919 | 2.6935   |    norm, n_iter=500 |
-| F2(1) | 116.982 | 0.849 | 2.639509 |    norm, n_iter=400(use_finetune=3:1) |
-| F2(2) | 200.908 | 0.921 | 2.741546 |    norm, n_iter=400(use_finetune=3:1) |
-| F2(3) | 286.830 | 0.947 | 2.750585 |    norm, n_iter=400(use_finetune=3:1) |
-| F2(3) | 287.730 | 0.951 | 2.758135 |    norm, n_iter=800(use_finetune=3:1) (⭐) |
-| F2(3) | 292.868 | 0.949 | 2.750686 |    norm, n_iter=800(use_finetune=3:1), +mse_loss |
+| F1(1)   |  79     | 0.930 | 2.8205   | no_norm, n_iter=200 |
+| F1(2)   | 157     | 0.954 | 2.8295   | no_norm, n_iter=200 |
+| F1(3)   | 235     | 0.965 | 2.8125   | no_norm, n_iter=200 |
+| F2(1)   | 145     | 0.966 | 2.8595   | no_norm, n_iter=500 |
+| F2(3)   | 236.164 | 0.985 | 2.851918 | no_norm, n_iter=800(use_finetune=3:1) |
+| F2(1)   | 101.446 | 0.961 | 2.871277 | no_norm, n_iter=400(use_finetune=3:1) (⭐) |
+| F2(1)   | 145     | 0.846 | 2.6195   |    norm, n_iter=500 |
+| F2(2)   | 289     | 0.919 | 2.6935   |    norm, n_iter=500 |
+| F2(1)   | 116.982 | 0.849 | 2.639509 |    norm, n_iter=400(use_finetune=3:1) |
+| F2(2)   | 200.908 | 0.921 | 2.741546 |    norm, n_iter=400(use_finetune=3:1) |
+| F2(3)   | 286.830 | 0.947 | 2.750585 |    norm, n_iter=400(use_finetune=3:1) |
+| F2(3)   | 287.730 | 0.951 | 2.758135 |    norm, n_iter=800(use_finetune=3:1) (⭐) |
+| F2(2/3) | 248.210 | 0.944 | 2.763895 |    norm, n_iter=800(use_finetune=3:1); score:0.576↑, fid:0.007↓ |
+| F2(3)   | 292.868 | 0.949 | 2.750686 |    norm, n_iter=800(use_finetune=3:1), +mse_loss |
 
 ⚪ clf results
 

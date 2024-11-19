@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
+from sklearn.metrics import confusion_matrix
 from model import QuantumNeuralNetwork
 from utils import reshape_norm_padding, get_fidelity, get_acc, QCIFAR10Dataset, CIFAR10Dataset
 
@@ -62,6 +63,9 @@ def test_model(model, test_loader, device):
     y_pred = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
     acc = get_acc(y_pred, y_true)
     fid = get_fidelity(state_pred, state_true)
+
+    cmat = confusion_matrix(y_true.cpu().numpy(), y_pred.cpu().numpy())
+    print(cmat)
 
     return acc, fid.item(), test_loader.dataset.get_gates_count()
 

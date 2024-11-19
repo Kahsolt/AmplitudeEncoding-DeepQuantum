@@ -1,20 +1,21 @@
 import os
+import sys
 import pickle
 import random
+from time import time
 import multiprocessing
 from functools import partial
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.utils import clip_grad_norm_
 from torch.utils.data import Dataset
+from torch import Tensor
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 import deepquantum as dq
 from tqdm import tqdm
-
 
 # 设置随机种子
 SEED = 42
@@ -27,6 +28,13 @@ torch.cuda.manual_seed_all(SEED)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
+if os.getenv('MY_LABORATORY') or sys.platform == 'win32':
+    DATA_PATH = '../../data'
+else:
+    DATA_PATH = '/data'
+
+get_score = lambda fid, gcnt: 2 * fid - gcnt / 2000
+
 
 def count_gates(cir):
     # cir is dq.QubitCircuit
@@ -35,7 +43,6 @@ def count_gates(cir):
         if isinstance(m, dq.operation.Gate) and (not isinstance(m, dq.gate.Barrier)):
             count += 1
     return count
-
 
 def reshape_norm_padding(x):
     # x: CIFAR10 image with shape (3, 32, 32) or (batch_size, 3, 32, 32)
@@ -54,7 +61,6 @@ def reshape_norm_padding(x):
     x = x.to(torch.complex64)
     return x.unsqueeze(-1)  # (batch_size, 4096, 1)
 
-
 def get_fidelity(state_pred, state_true):
     # state_pred, state_true: (batch_size, 4096, 1)
     state_pred = state_pred.view(-1, 4096)
@@ -62,6 +68,19 @@ def get_fidelity(state_pred, state_true):
     fidelity = torch.abs(torch.matmul(state_true.conj(), state_pred.T)) ** 2
     return fidelity.diag().mean()
 
+def get_fidelity_fast(state_pred, state_true):
+    # state_pred, state_true: (batch_size, 4096, 1)
+    state_pred = state_pred.view(-1, 4096).real
+    state_true = state_true.view(-1, 4096).real
+    fidelity = (state_pred * state_true).sum(-1)**2
+    return fidelity.mean()
+
+def get_fidelity_NxN(state_pred:Tensor, state_true:Tensor) -> Tensor:
+    # state_pred, state_true: (batch_size, 4096, 1)
+    state_pred = state_pred.flatten(1).real
+    state_true = state_true.flatten(1).real
+    fid_mat = torch.abs(torch.matmul(state_true, state_pred.T)) ** 2
+    return fid_mat
 
 def get_acc(y_pred, y_true):
     # 计算准确率
@@ -76,7 +95,6 @@ cifar10_transforms = transforms.Compose([
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
 ])
 
-
 class CIFAR10Dataset(Dataset):
     def __init__(self, train:bool = True, size:int = 100000000):
         """
@@ -85,7 +103,7 @@ class CIFAR10Dataset(Dataset):
             train (bool): 是否加载训练数据集，如果为 False，则加载测试数据集。默认为 True。
             size (int): 数据集的大小。
         """
-        self.dataset = torchvision.datasets.CIFAR10(root='/data', train=train, 
+        self.dataset = torchvision.datasets.CIFAR10(root=DATA_PATH, train=train, 
                                                     download=True, transform=cifar10_transforms)
 
         self.class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer', 
@@ -179,30 +197,98 @@ class PerfectAmplitudeEncodingDataset(Dataset):
 # 注意: 决赛的数据集名字必须固定为 QCIFAR10Dataset
 # todo: 构建振幅编码线路
 def encode_single_data(data, num_qubits=12, num_layers=10):
-    image, label = data
+    image, label = data     # [3, 32, 32], []
+    target = reshape_norm_padding(image)
     
-    # 构建振幅编码线路
-    encoding_circuit = dq.QubitCircuit(num_qubits)
-    encoding_circuit.rylayer(encode=True)
-    for _ in range(num_layers):
-        encoding_circuit.rylayer()
-   
-    # Count gates before encoding
-    gate_count = count_gates(encoding_circuit)
-    
-    encoding_circuit.encode([image.mean()]*num_qubits)
-    
-    # 优化参数，使得线路能够制备出|x>
-    optimizer = torch.optim.Adam(encoding_circuit.parameters(), lr=0.01)
-    for _ in range(200):
-        state = encoding_circuit()
-        loss = 1 - get_fidelity(state.unsqueeze(0), reshape_norm_padding(image))
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-    
-    # Detach the state tensor before returning
-    return (image, label, encoding_circuit().detach(), gate_count)
+    def vqc_F2_all_wise_init_0(nq:int=12, n_rep:int=1):
+        ''' RY(single init) - [pairwise(F2) - RY], param zero init '''
+        vqc = dq.QubitCircuit(nqubit=nq)
+        # MAGIC: 2*arccos(sqrt(2/3)) = 1.2309594173407747, only init wire 0
+        g = dq.Ry(nqubit=nq, wires=0, requires_grad=True) ; g.init_para([2.4619188346815495]) ; vqc.add(g)
+        for _ in range(n_rep):
+            for i in range(nq-1):   # qubit order
+                for j in range(i+1, nq):
+                    g = dq.Ry(nqubit=nq, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+                    g = dq.Ry(nqubit=nq, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+            for i in range(nq):
+                g = dq.Ry(nqubit=nq, wires=i, requires_grad=True) ; g.init_para([0.0]) ; vqc.add(g)
+        return vqc
+
+    n_iter = 800
+    train_iter    = n_iter // 4 * 3
+    finetune_iter = n_iter // 4
+        
+    best_score = -1
+    best_vqc = None
+    best_gate_count = None
+    for nlayer in [2, 3]:
+        vqc = vqc_F2_all_wise_init_0(num_qubits, nlayer)
+        gate_count = count_gates(vqc)
+        optimizer = torch.optim.Adam(vqc.parameters(), lr=0.1)
+
+        for _ in range(train_iter):
+            loss = -get_fidelity_fast(vqc(), target)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        vqc = prune_circuit(vqc, target, optimizer)
+        gate_count = count_gates(vqc)
+
+        for _ in range(finetune_iter):
+            loss = -get_fidelity_fast(vqc(), target)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        fid = get_fidelity_fast(vqc(), target).item()
+        score = get_score(fid, gate_count)
+        print('nlayer:', nlayer, 'score:', score, 'fid:', fid, 'gcnt:', gate_count)
+
+        if score > best_score:   # pick the best!
+            best_score = score
+            best_vqc = vqc
+            best_gate_count = gate_count
+
+    return (image, label, best_vqc().detach(), best_gate_count)
+
+@torch.inference_mode
+def prune_circuit(qc:dq.QubitCircuit, tgt:torch.Tensor, opt:torch.optim.Adam) -> dq.QubitCircuit:
+    PI = np.pi
+    PI2 = np.pi * 2
+    def phi_norm(agl:float) -> float:
+        agl %= PI2
+        if agl > +PI: agl -= PI2
+        if agl < -PI: agl += PI2
+        return agl
+
+    params = opt.param_groups[0]['params']
+    ops: nn.Sequential = qc.operators
+    fid = get_fidelity_fast(qc(), tgt).item()
+    gcnt = count_gates(qc)
+    sc = get_score(fid, gcnt)
+    sc_new = sc
+    while sc_new >= sc:
+        idx_sel = -1
+        min_agl = 3.14
+        for idx, op in enumerate(ops):
+            agl = abs(phi_norm(op.theta.item()))
+            if agl < min_agl:
+                min_agl = agl
+                idx_sel = idx
+        if idx_sel < 0: break
+        # remove from circuit
+        del ops[idx_sel]
+        # remove from optimizer
+        tensor = params[idx_sel]
+        del params[idx_sel]
+        del opt.state[tensor]
+        # new score
+        fid = get_fidelity_fast(qc(), tgt).item()
+        gcnt -= 1
+        sc_new = get_score(fid, gcnt)
+
+    return qc
 
 
 class QCIFAR10Dataset(Dataset):
@@ -222,7 +308,7 @@ class QCIFAR10Dataset(Dataset):
         """
         返回: a list of tuples (原始经典数据, 标签, 振幅编码量子线路的输出)=(image, label, state_vector)
         """
-        num_cores = 20  # todo: 修改为合适的配置
+        num_cores = 16  # todo: 修改为合适的配置
         pool = multiprocessing.Pool(num_cores)
         
         # Create a partial function with fixed parameters
@@ -254,32 +340,17 @@ class QCIFAR10Dataset(Dataset):
         return x, y, z
 
 
-
-
-
-
-
-
-
 if __name__ == '__main__':
+    ts_start = time()
 
     # 实例化测试集 QCIFAR10Dataset 并保存为pickle文件
     OUTPUT_DIR = 'output'
     # 确保目录存在
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     test_dataset = QCIFAR10Dataset(train=False) 
-    print('dataset labels', [sample[1].item() for sample in test_dataset])
+    print('dataset labels:', [sample[1].item() for sample in test_dataset])
     with open(f'{OUTPUT_DIR}/test_dataset.pkl', 'wb') as file:
         pickle.dump(test_dataset, file)
 
-
-
-
-
-
-
-
-
-
-
-
+    ts_end = time()
+    print(f'>> Done! (timecost: {ts_end - ts_start:5f}s)')      # 15569.065662s
