@@ -98,3 +98,12 @@ REM https://github.com/RaoulHeese/qtree
 
 REM Synthesis of Quantum Logic Circuit
 wget -nc https://arxiv.org/pdf/quant-ph/0406176.pdf
+
+
+:QClassifier
+REM Quantum Neural Network Classifiers: A Tutorial
+REM https://github.com/LWKJJONAK/Quantum_Neural_Network_Classifiers
+wget -nc https://arxiv.org/pdf/2206.02806.pdf
+
+REM Quantum Computation-Based Image Representation, Processing Operations and Their Applications
+REM https://www.researchgate.net/publication/266855738_Quantum_Computation-Based_Image_Representation_Processing_Operations_and_Their_Applications

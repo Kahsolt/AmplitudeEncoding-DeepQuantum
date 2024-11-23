@@ -638,6 +638,206 @@ class QuantumNeuralNetworkAnsatz(nn.Module):
         return output
 
 
+# 纯线路模型，含辅助比特
+class QuantumNeuralNetworkAnsatzExt(nn.Module):
+
+    def __init__(self, num_qubits, num_layers):
+        super().__init__()
+        self.num_ancilla = 2
+        self.anc0 = torch.zeros([2**self.num_ancilla], dtype=torch.float32)
+        self.anc0[0] = 1
+        self.num_qubits = num_qubits + self.num_ancilla
+        self.num_layers = num_layers
+        self.var_circuit = dq.QubitCircuit(self.num_qubits)
+        self.create_var_circuit()
+
+    def create_var_circuit(self):
+        vqc = self.var_circuit
+        nq = self.num_qubits
+
+        # n_layer=3, gcnt=468, pcnt=1404; acc=30.200% (epoch=10)
+        if not 'F2_all_0':
+            ''' U3 - [pairwise(F2) - U3], param zero init '''
+            nq = 12
+            for i in range(nq):
+                g = dq.U3Gate(nqubit=self.num_qubits, wires=0, requires_grad=True) ; g.init_para([0.0, 0.0, 0.0]) ; vqc.add(g)
+            for _ in range(self.num_layers):
+                for i in range(nq-1):   # qubit order
+                    for j in range(i+1, nq):
+                        g = dq.U3Gate(nqubit=self.num_qubits, wires=j, controls=i, requires_grad=True) ; g.init_para([0.0, 0.0, 0.0]) ; vqc.add(g)
+                        g = dq.U3Gate(nqubit=self.num_qubits, wires=i, controls=j, requires_grad=True) ; g.init_para([0.0, 0.0, 0.0]) ; vqc.add(g)
+                for i in range(nq):
+                    g = dq.U3Gate(nqubit=self.num_qubits, wires=i, requires_grad=True) ; g.init_para([0.0, 0.0, 0.0]) ; vqc.add(g)
+            for i in range(nq):
+                vqc.u3(12, controls=i)
+                vqc.u3(13, controls=i)
+
+        # n_layer=3, gcnt=443, pcnt=627; acc=31.267%/39.000% (epoch=10)
+        if not 'U-V brick':
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            # uv-brick
+            for _ in range(self.num_layers):
+                add_U(1, 2) ; add_U(3, 4) ; add_U(5, 6) ; add_U(7, 8) ; add_U(9, 10) ; add_U(11, 0)
+                add_U(0, 1) ; add_U(2, 3) ; add_U(4, 5) ; add_U(6, 7) ; add_U(8, 9)  ; add_U(10, 11)
+                add_V(0, 1) ; add_V(2, 3) ; add_V(4, 5) ; add_V(6, 7) ; add_V(8, 9)  ; add_V(10, 11)
+            # readout
+            if not 'best':  # 39.000%
+                for i in range(6):     vqc.u3(12, controls=i)
+                for i in range(7, 12): vqc.u3(13, controls=i)
+            else:           # 31.267%
+                for i in range(12):
+                    vqc.u3(12, controls=i)
+                    vqc.u3(13, controls=i)
+
+        # n_layer=1, gcnt=1285, pcnt=1671; acc=38.467% (epoch=10，往后可逼近40%)
+        if 'U-V all':
+            self.num_layers = 1
+
+            def add_U(i:int, j:int):  # conv
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(j, i) ; vqc.rz(i) ; vqc.ry(j)
+                vqc.cnot(i, j) ;             vqc.ry(j)
+                vqc.cnot(j, i)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_V(i:int, j:int):  # pool
+                vqc.u3(i)
+                g = dq.U3Gate(nqubit=self.num_qubits)
+                vqc.add(g, wires=j)
+                vqc.cnot(i, j)
+                vqc.add(g.inverse(), wires=j)
+
+            for _ in range(self.num_layers):
+                for i in range(self.num_qubits-1):
+                    for j in range(i + 1, self.num_qubits):
+                        add_U(i, j)
+                        add_V(i, j)
+            for i in range(6):     vqc.u3(12, controls=i)
+            for i in range(7, 12): vqc.u3(13, controls=i)
+
+        # n_layer=3, gcnt=318, pcnt=666; acc=35.733% (epoch=10)
+        if not 'qcnn arXiv:2312.00358':
+            # https://pennylane.ai/qml/demos/tutorial_learning_few_data/
+            for _ in range(self.num_layers):
+                # init
+                for i in range(nq): vqc.u3(i)
+                # block1
+                for i in range(0, nq, 2):
+                    vqc.rxx([i, i+1])
+                    vqc.ryy([i, i+1])
+                    vqc.rzz([i, i+1])
+                for i in range(nq): vqc.u3(i)
+                # block2
+                for i in range(1, nq-1, 2):
+                    vqc.rxx([i, i+1])
+                    vqc.ryy([i, i+1])
+                    vqc.rzz([i, i+1])
+                for i in range(1, nq-1): vqc.u3(i)
+                for i in range(0, nq, 2):   # pool, left qubits:[0, 2, 4, 6, 8, 10]
+                    vqc.u3(i, controls=i+1)
+                # block3
+                vqc.rxx([0,  2]) ; vqc.ryy([0,  2]) ; vqc.rzz([0,  2])
+                vqc.rxx([4,  6]) ; vqc.ryy([4,  6]) ; vqc.rzz([4,  6])
+                vqc.rxx([8, 10]) ; vqc.ryy([8, 10]) ; vqc.rzz([8, 10])
+                for i in [0, 2, 4, 6, 8, 10]: vqc.u3(i)
+                vqc.u3(0, controls= 2)  # pool, left qubits: [0,4,8]
+                vqc.u3(4, controls= 6)
+                vqc.u3(8, controls=10)
+
+            for i in [0, 4, 8]:
+                vqc.u3(12, controls=i)
+                vqc.u3(13, controls=i)
+
+        # gcnt=612, pcnt=815; acc=32.600% (epoch=10，之后越学越差)
+        if not 'qcnn arXiv:2404.12741':
+            def add_F1(wires:List[int]):
+                for i in          wires:  vqc.ry(i)
+                for i in          wires:  vqc.rx(i, controls=(i-1+nq)%nq)
+                for i in          wires:  vqc.ry(i)
+                for i in reversed(wires): vqc.rx((i-1+nq)%nq, controls=i)
+
+            def add_F2(i:int, j:int):
+                vqc.u3(i) ; vqc.u3(j)
+                vqc.cnot(i, j) ; vqc.ry(i) ; vqc.ry(j)
+                vqc.cnot(j, i) ; vqc.ry(j)
+                vqc.cnot(i, j)
+                vqc.u3(i) ; vqc.u3(j)
+
+            def add_P(i:int, j:int):    # j是控制位，且舍弃j
+                vqc.rz(i, controls=j)
+                vqc.x(j)
+                vqc.rx(i, controls=j)
+
+            # layer1
+            add_F1([0, 1, 2, 3,  4,  5])
+            add_F1([6, 7, 8, 9, 10, 11])
+            add_F2(0, 1) ; add_F2(2, 3) ; add_F2(4, 5) ; add_F2(6, 7) ; add_F2(8, 9)  ; add_F2(10, 11)
+            add_F2(1, 2) ; add_F2(3, 4) ; add_F2(5, 6) ; add_F2(7, 8) ; add_F2(9, 10) ; add_F2(11, 0)
+            add_P(0, 1)  ; add_P(10, 11)
+            # layer2
+            add_F1([0, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+            add_F2(0, 2) ; add_F2(3, 4) ; add_F2(5, 6) ; add_F2(7, 8) ; add_F2(9, 10)
+            add_F2(2, 3) ; add_F2(4, 5) ; add_F2(6, 7) ; add_F2(8, 9) ; add_F2(10, 0)
+            add_P(2, 3)  ; add_P(8, 9)
+            # layer3
+            add_F1([0, 2, 4, 5, 6, 7, 8, 10])
+            add_F2(0, 2) ; add_F2(4, 5) ; add_F2(6, 7) ; add_F2(8, 10)
+            add_F2(2, 4) ; add_F2(5, 6) ; add_F2(7, 8) ; add_F2(10, 0)
+            add_P(4, 5)  ; add_P(6, 7)
+            # layer4
+            add_F1([0, 2, 4, 6, 8, 10])
+            add_F2(0, 2) ; add_F2(4, 6) ; add_F2(8, 10)
+            add_F2(2, 4) ; add_F2(6, 8) ; add_F2(10, 0)
+            if 'layer5 & layer6':
+                # layer5
+                add_P(0, 2) ; add_P(8, 10)
+                add_F1([0, 4, 6, 8])
+                add_F2(0, 4) ; add_F2(6, 8)
+                add_F2(4, 6) ; add_F2(8, 10)
+                # layer6
+                add_P(0, 4) ; add_P(6, 8)
+                add_F1([0, 6])
+                add_F2(0, 6)
+
+            for i in [0, 6]:
+                vqc.u3(12, controls=i)
+                vqc.u3(13, controls=i)
+
+        vqc.observable(12, basis='z')
+        vqc.observable(12, basis='x')
+        vqc.observable(12, basis='y')
+        vqc.observable(13, basis='z')
+        vqc.observable(13, basis='x')
+
+        print('classifier gate count:', count_gates(vqc))
+
+    def forward(self, z, y):
+        z_ext = torch.kron(z.squeeze(-1), self.anc0.to(z.device, z.dtype)).unsqueeze(-1)
+        self.var_circuit(state=z_ext)
+        output = self.var_circuit.expectation()
+        return F.cross_entropy(output, y), output
+
+    @torch.inference_mode
+    def inference(self, z):
+        z_ext = torch.kron(z.squeeze(-1), self.anc0.to(z.device, z.dtype)).unsqueeze(-1)
+        self.var_circuit(state=z_ext)
+        output = self.var_circuit.expectation()     
+        return output
+
+
 # 实验：能用 ansatz-encoder-ansatz 结构充当 QMLP 吗？
 # 结论是不行，哎。。。
 class QuantumNeuralNetworkAnsatzMLP(nn.Module):
@@ -747,6 +947,8 @@ class QuantumNeuralNetworkAnsatzMLP(nn.Module):
         return output
 
 
+''' 卧槽！突然发现对比学习系列的模型形式上难道都算含有经典参数。。。可能不能用了 :( '''
+
 # 对比学习!!
 class QuantumNeuralNetworkCL(nn.Module):
 
@@ -830,6 +1032,7 @@ class QuantumNeuralNetworkCL(nn.Module):
                     g.init_para([0.0])
                     vqc.add(g)
 
+        # n_layer=3,  gcnt=504,  pcnt=863
         # n_layer=8,  gcnt=1224, pcnt=1656
         # n_layer=10, gcnt=1512, pcnt=2052
         if 'U-V brick':
@@ -1153,7 +1356,7 @@ class QuantumNeuralNetworkCLMLP(nn.Module):
         return logits                               # [B, NC=5]
 
 
-QuantumNeuralNetwork = QuantumNeuralNetworkCLEnsemble
+QuantumNeuralNetwork = QuantumNeuralNetworkAnsatzExt
 
 
 if __name__ == '__main__':

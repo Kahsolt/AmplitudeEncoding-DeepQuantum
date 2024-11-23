@@ -145,14 +145,14 @@ if __name__ == '__main__':
   if RESUME:
     with open(f'{BASE_OUTPUT_DIR}/model_config.pkl', 'rb') as file:
       model_config = pkl.load(file)
-    model = QuantumNeuralNetwork(**model_config)
+    model = QuantumNeuralNetworkCL(**model_config)
     save_fp = os.path.join(BASE_OUTPUT_DIR, "best_model.pt")
     print(f'>> resume from {save_fp}')
     state_dict = torch.load(save_fp)
     model.load_state_dict(state_dict)
   else:
     model_config = {'num_qubits': 12, 'num_layers': NUM_LAYER}
-    model = QuantumNeuralNetwork(**model_config)
+    model = QuantumNeuralNetworkCL(**model_config)
   optimizer = optim.Adam(model.parameters(), lr=0.001)
 
   # 将字典保存到文件中

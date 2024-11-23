@@ -15,6 +15,7 @@ import os
 import torch.nn as nn
 from argparse import ArgumentParser
 
+from model import QuantumNeuralNetworkCL
 from test import *
 
 
@@ -49,7 +50,7 @@ if __name__ == '__main__':
 
     with open(f'{OUTPUT_DIR}/model_config.pkl', 'rb') as file:
         model_config = pkl.load(file)
-    model = QuantumNeuralNetwork(**model_config)
+    model = QuantumNeuralNetworkCL(**model_config)
     model.ref_qstate = nn.Parameter(torch.zeros([2, 36], requires_grad=False))      # fix shape
     model = model.to(DEVICE)
 
