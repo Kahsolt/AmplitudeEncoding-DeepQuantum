@@ -45,6 +45,7 @@ runtime: 111.535
 | F2(3)   | 286.830 | 0.947 | 2.750585 |    norm, n_iter=400(use_finetune=3:1) |
 | F2(3)   | 287.730 | 0.951 | 2.758135 |    norm, n_iter=800(use_finetune=3:1) (⭐) |
 | F2(2/3) | 248.210 | 0.944 | 2.763895 |    norm, n_iter=800(use_finetune=3:1); score:0.576↑, fid:0.007↓ |
+| F2(2/3) | 241.652 | 0.944 | 2.767174 |    norm, n_iter=800(use_finetune=3:1); remove |0>-ctrl |
 | F2(3)   | 292.868 | 0.949 | 2.750686 |    norm, n_iter=800(use_finetune=3:1), +mse_loss |
 
 ⚪ clf results

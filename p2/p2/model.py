@@ -73,7 +73,6 @@ class QuantumNeuralNetworkCL(nn.Module):
         self.ref_qstate = nn.Parameter(torch.zeros([n_class, 36], requires_grad=False))
         self.is_training = False    # when True, do not use `self.ref_qstate`
 
-    # gcnt=, pcnt=
     def create_var_circuit(self):
         vqc = self.var_circuit
 

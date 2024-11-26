@@ -492,12 +492,15 @@ def encode_single_data(data, debug:bool=False):
             #print('gate_count_prune:', gate_count_prune)
             gate_count = gate_count_prune
 
+    # encoding_circuit.draw(output='text', filename='vqc.txt')
+
     print('score:', get_score(-loss.item(), gate_count), 'fid:', -loss.item(), 'gcnt:', gate_count)
     # Detach the state tensor before returning
     return (image, label, encoding_circuit().detach(), gate_count)
 
 @torch.inference_mode
 def prune_circuit(qc:dq.QubitCircuit, tgt:Tensor, opt:Adam) -> dq.QubitCircuit:
+    ''' Trim small rotations '''
     PI = np.pi
     PI2 = np.pi * 2
     def phi_norm(agl:float) -> float:
@@ -530,6 +533,18 @@ def prune_circuit(qc:dq.QubitCircuit, tgt:Tensor, opt:Adam) -> dq.QubitCircuit:
         fid = get_fidelity(qc().unsqueeze(0), tgt).item()
         gcnt -= 1
         sc_new = get_score(fid, gcnt)
+
+    ''' Remove |0>-ctrl CRY '''
+    wires = [False] * qc.nqubit     # 当前 qubit 上是否至少有一个旋转作用
+    ops_new = []
+    for op in qc.operators:
+        if op.controls:
+            c = op.controls[0]
+            if not wires[c]: continue
+        for w in op.wires:
+            wires[w] = True
+        ops_new.append(op)
+    qc.operators = nn.Sequential(*ops_new)
 
     return qc
 

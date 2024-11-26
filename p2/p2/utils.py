@@ -217,10 +217,12 @@ def encode_single_data(data, num_qubits=12, num_layers=10):
     n_iter = 800
     train_iter    = n_iter // 4 * 3
     finetune_iter = n_iter // 4
-        
+
     best_score = -1
     best_vqc = None
     best_gate_count = None
+    best_nlayer = -1
+    score_list = []
     for nlayer in [2, 3]:
         vqc = vqc_F2_all_wise_init_0(num_qubits, nlayer)
         gate_count = count_gates(vqc)
@@ -243,17 +245,21 @@ def encode_single_data(data, num_qubits=12, num_layers=10):
 
         fid = get_fidelity_fast(vqc(), target).item()
         score = get_score(fid, gate_count)
+        score_list.append(score)
         print('nlayer:', nlayer, 'score:', score, 'fid:', fid, 'gcnt:', gate_count)
 
         if score > best_score:   # pick the best!
+            best_nlayer = nlayer
             best_score = score
             best_vqc = vqc
             best_gate_count = gate_count
 
+    print('>> best_nlayer:', best_nlayer, 'score_list', score_list)
     return (image, label, best_vqc().detach(), best_gate_count)
 
 @torch.inference_mode
 def prune_circuit(qc:dq.QubitCircuit, tgt:torch.Tensor, opt:torch.optim.Adam) -> dq.QubitCircuit:
+    ''' Trim small rotations '''
     PI = np.pi
     PI2 = np.pi * 2
     def phi_norm(agl:float) -> float:
@@ -287,6 +293,18 @@ def prune_circuit(qc:dq.QubitCircuit, tgt:torch.Tensor, opt:torch.optim.Adam) ->
         fid = get_fidelity_fast(qc(), tgt).item()
         gcnt -= 1
         sc_new = get_score(fid, gcnt)
+
+    ''' Remove |0>-ctrl CRY '''
+    wires = [False] * qc.nqubit     # 当前 qubit 上是否至少有一个旋转作用
+    ops_new = []
+    for op in qc.operators:
+        if op.controls:
+            c = op.controls[0]
+            if not wires[c]: continue
+        for w in op.wires:
+            wires[w] = True
+        ops_new.append(op)
+    qc.operators = nn.Sequential(*ops_new)
 
     return qc
 
